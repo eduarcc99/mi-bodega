@@ -80,11 +80,11 @@ export interface ProductoForm {
   nombre: string
   categoria_id: string
   unidad: UnidadMedida
-  stock: number
-  stock_minimo: number
-  costo: number
-  margen_pct: number
-  precio_venta: number
+  stock: string
+  stock_minimo: string
+  costo: string
+  margen_pct: string
+  precio_venta: string
   fecha_vencimiento: string
   activo: boolean
   imagen_url: string

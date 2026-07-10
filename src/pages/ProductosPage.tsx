@@ -28,16 +28,27 @@ const emptyForm: ProductoForm = {
   nombre: '',
   categoria_id: '',
   unidad: 'unidad',
-  stock: 0,
-  stock_minimo: 5,
-  costo: 0,
-  margen_pct: 25,
-  precio_venta: 0,
+  stock: '',
+  stock_minimo: '5',
+  costo: '',
+  margen_pct: '25',
+  precio_venta: '',
   fecha_vencimiento: '',
   activo: true,
   imagen_url: '',
   cantidad_mayor: '',
   precio_mayor: '',
+}
+
+function parseNum(value: string, fallback = 0): number {
+  const n = parseFloat(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function recalcPrecioVenta(costo: string, margen: string): string {
+  const c = parseNum(costo)
+  if (costo.trim() === '' || c <= 0) return ''
+  return String(calcularPrecioVenta(c, parseNum(margen, 25)))
 }
 
 export function ProductosPage() {
@@ -73,7 +84,8 @@ export function ProductosPage() {
 
   function openNew() {
     setEditId(null)
-    setForm({ ...emptyForm, margen_pct: categorias[0]?.margen_default ?? 25, categoria_id: categorias[0]?.id ?? '' })
+    const margen = String(categorias[0]?.margen_default ?? 25)
+    setForm({ ...emptyForm, margen_pct: margen, categoria_id: categorias[0]?.id ?? '' })
     setError('')
     setModalOpen(true)
   }
@@ -85,11 +97,11 @@ export function ProductosPage() {
       nombre: p.nombre,
       categoria_id: p.categoria_id ?? '',
       unidad: p.unidad,
-      stock: p.stock,
-      stock_minimo: p.stock_minimo,
-      costo: p.costo,
-      margen_pct: p.margen_pct ?? 25,
-      precio_venta: p.precio_venta,
+      stock: String(p.stock),
+      stock_minimo: String(p.stock_minimo),
+      costo: String(p.costo),
+      margen_pct: String(p.margen_pct ?? 25),
+      precio_venta: String(p.precio_venta),
       fecha_vencimiento: p.fecha_vencimiento ?? '',
       activo: p.activo,
       imagen_url: p.imagen_url ?? '',
@@ -100,19 +112,19 @@ export function ProductosPage() {
     setModalOpen(true)
   }
 
-  function updateForm(field: keyof ProductoForm, value: string | number | boolean) {
+  function updateForm(field: keyof ProductoForm, value: string | boolean) {
     setForm((prev) => {
       const next = { ...prev, [field]: value }
       if (field === 'costo' || field === 'margen_pct') {
-        const costo = field === 'costo' ? Number(value) : prev.costo
-        const margen = field === 'margen_pct' ? Number(value) : prev.margen_pct
-        next.precio_venta = calcularPrecioVenta(costo, margen)
+        const costo = field === 'costo' ? String(value) : prev.costo
+        const margen = field === 'margen_pct' ? String(value) : prev.margen_pct
+        next.precio_venta = recalcPrecioVenta(costo, margen)
       }
       if (field === 'categoria_id') {
         const cat = categorias.find((c) => c.id === value)
         if (cat) {
-          next.margen_pct = cat.margen_default
-          next.precio_venta = calcularPrecioVenta(next.costo, cat.margen_default)
+          next.margen_pct = String(cat.margen_default)
+          next.precio_venta = recalcPrecioVenta(next.costo, String(cat.margen_default))
         }
       }
       return next
@@ -139,19 +151,29 @@ export function ProductosPage() {
       setError('El nombre es obligatorio')
       return
     }
+    if (form.costo.trim() === '') {
+      setError('Ingresa el costo del producto')
+      return
+    }
     setSaving(true)
     setError('')
+
+    const costo = parseNum(form.costo)
+    const margen = parseNum(form.margen_pct, 25)
+    const precioVenta = form.precio_venta.trim()
+      ? parseNum(form.precio_venta)
+      : calcularPrecioVenta(costo, margen)
 
     const payload = {
       codigo_barra: form.codigo_barra || null,
       nombre: form.nombre.trim(),
       categoria_id: form.categoria_id || null,
       unidad: form.unidad as UnidadMedida,
-      stock: form.stock,
-      stock_minimo: form.stock_minimo,
-      costo: form.costo,
-      precio_venta: form.precio_venta,
-      margen_pct: form.margen_pct,
+      stock: parseNum(form.stock),
+      stock_minimo: parseNum(form.stock_minimo, 5),
+      costo,
+      precio_venta: precioVenta,
+      margen_pct: margen,
       fecha_vencimiento: form.fecha_vencimiento || null,
       activo: form.activo,
       imagen_url: form.imagen_url || null,
@@ -380,8 +402,9 @@ export function ProductosPage() {
                     min="0"
                     step="0.01"
                     value={form.costo}
-                    onChange={(e) => updateForm('costo', Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"
+                    onChange={(e) => updateForm('costo', e.target.value)}
+                    placeholder="Ej: 3.50"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 placeholder:text-slate-400"
                   />
                 </div>
                 <div>
@@ -392,8 +415,9 @@ export function ProductosPage() {
                     max="99"
                     step="0.1"
                     value={form.margen_pct}
-                    onChange={(e) => updateForm('margen_pct', Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"
+                    onChange={(e) => updateForm('margen_pct', e.target.value)}
+                    placeholder="Ej: 25"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 placeholder:text-slate-400"
                   />
                 </div>
                 <div>
@@ -403,8 +427,9 @@ export function ProductosPage() {
                     min="0"
                     step="0.01"
                     value={form.precio_venta}
-                    onChange={(e) => updateForm('precio_venta', Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 font-semibold outline-none focus:border-teal-500"
+                    onChange={(e) => updateForm('precio_venta', e.target.value)}
+                    placeholder="Se calcula solo"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 font-semibold outline-none focus:border-teal-500 placeholder:font-normal placeholder:text-slate-400"
                   />
                 </div>
               </div>
@@ -417,8 +442,9 @@ export function ProductosPage() {
                     min="0"
                     step="0.001"
                     value={form.stock}
-                    onChange={(e) => updateForm('stock', Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"
+                    onChange={(e) => updateForm('stock', e.target.value)}
+                    placeholder="Ej: 20"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 placeholder:text-slate-400"
                   />
                 </div>
                 <div>
@@ -428,8 +454,9 @@ export function ProductosPage() {
                     min="0"
                     step="0.001"
                     value={form.stock_minimo}
-                    onChange={(e) => updateForm('stock_minimo', Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"
+                    onChange={(e) => updateForm('stock_minimo', e.target.value)}
+                    placeholder="Ej: 5"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500 placeholder:text-slate-400"
                   />
                 </div>
               </div>
