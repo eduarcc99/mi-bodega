@@ -208,3 +208,65 @@ export async function fetchDevolucionesDelDia(fecha: string): Promise<
 
   return (data ?? []) as { id: string; total: number; metodo_pago: MetodoPago; venta_id: string }[]
 }
+
+export interface DevolucionDetalleConVenta {
+  producto_id: string | null
+  venta_detalle_id: string | null
+  cantidad: number
+  monto_devuelto: number
+  venta_detalles: {
+    nombre_producto: string
+    cantidad: number
+    precio_unitario: number
+    descuento: number
+    costo_unitario: number
+    producto_id: string | null
+    productos: {
+      categorias: { nombre: string } | null
+    } | null
+  } | null
+}
+
+export interface DevolucionEnRango {
+  id: string
+  fecha: string
+  total: number
+  venta_id: string
+  devolucion_detalles: DevolucionDetalleConVenta[]
+}
+
+export async function fetchDevolucionesEnRango(desde: Date, hasta: Date): Promise<DevolucionEnRango[]> {
+  const { data, error } = await supabase
+    .from('devoluciones')
+    .select(`
+      id, fecha, total, venta_id,
+      devolucion_detalles(
+        producto_id, venta_detalle_id, cantidad, monto_devuelto,
+        venta_detalles(
+          nombre_producto, cantidad, precio_unitario, descuento, costo_unitario, producto_id,
+          productos(categorias(nombre))
+        )
+      )
+    `)
+    .gte('fecha', desde.toISOString())
+    .lte('fecha', hasta.toISOString())
+    .order('fecha', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return (data as unknown as DevolucionEnRango[]) ?? []
+}
+
+export function totalDevoluciones(devoluciones: DevolucionEnRango[]): number {
+  return devoluciones.reduce((s, d) => s + Number(d.total), 0)
+}
+
+export function gananciaPerdidaDevoluciones(devoluciones: DevolucionEnRango[]): number {
+  let perdida = 0
+  for (const dev of devoluciones) {
+    for (const d of dev.devolucion_detalles ?? []) {
+      const costo = Number(d.venta_detalles?.costo_unitario ?? 0)
+      perdida += Number(d.monto_devuelto) - costo * Number(d.cantidad)
+    }
+  }
+  return Math.round(perdida * 100) / 100
+}

@@ -25,6 +25,7 @@ import {
   calcTopGanancia,
   calcVentasDiarias,
 } from '@/lib/dashboard'
+import { fetchDevolucionesEnRango } from '@/lib/devoluciones'
 import {
   TopProductosChart,
   CategoriasPieChart,
@@ -69,9 +70,10 @@ export function DashboardPage() {
     setLoading(true)
     try {
       const { desde, hasta } = getRangoPeriodo(periodo)
-      const [kpiData, ventas, alertasData, vencData] = await Promise.all([
+      const [kpiData, ventas, devoluciones, alertasData, vencData] = await Promise.all([
         fetchKpis(),
         fetchVentasEnRango(desde, hasta),
+        fetchDevolucionesEnRango(desde, hasta),
         fetchAlertas(),
         fetchMapaVencimientos(),
       ])
@@ -79,10 +81,10 @@ export function DashboardPage() {
       setKpis(kpiData)
       setAlertas(alertasData)
       setVencimientos(vencData)
-      setTopProductos(calcTopProductos(ventas))
-      setCategorias(calcVentasPorCategoria(ventas))
-      setGanancia(calcTopGanancia(ventas))
-      setVentasDiarias(calcVentasDiarias(ventas))
+      setTopProductos(calcTopProductos(ventas, devoluciones))
+      setCategorias(calcVentasPorCategoria(ventas, devoluciones))
+      setGanancia(calcTopGanancia(ventas, devoluciones))
+      setVentasDiarias(calcVentasDiarias(ventas, devoluciones))
     } catch {
       /* datos parciales ok */
     } finally {
@@ -96,8 +98,8 @@ export function DashboardPage() {
 
   const kpiCards = kpis
     ? [
-        { label: 'Ventas del día', value: formatMoney(kpis.ventasDia), icon: TrendingUp, color: 'bg-blue-500' },
-        { label: 'Ganancia estimada hoy', value: formatMoney(kpis.gananciaDia), icon: DollarSign, color: 'bg-emerald-500' },
+        { label: 'Ventas netas del día', value: formatMoney(kpis.ventasDia), icon: TrendingUp, color: 'bg-blue-500' },
+        { label: 'Ganancia neta hoy', value: formatMoney(kpis.gananciaDia), icon: DollarSign, color: 'bg-emerald-500' },
         { label: 'Stock bajo', value: `${kpis.stockBajo} productos`, icon: AlertTriangle, color: 'bg-amber-500' },
         {
           label: 'Por vencer / vencidos',

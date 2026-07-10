@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { fetchDevolucionesEnRango, totalDevoluciones } from '@/lib/devoluciones'
 import { formatMoney, diasHastaVencimiento, productoVencido } from '@/lib/utils'
 
 export type TipoReporte = 'ventas' | 'compras' | 'inventario' | 'vencimientos' | 'cierres'
@@ -24,19 +25,22 @@ function rangoISO(desde: string, hasta: string) {
 export async function fetchReporteVentas(desde: string, hasta: string): Promise<ReporteData> {
   const { desde: d, hasta: h } = rangoISO(desde, hasta)
 
-  const { data, error } = await supabase
-    .from('ventas')
-    .select(`
-      id, fecha, total, metodo_pago, estado,
-      perfiles:cajero_id(nombre)
-    `)
-    .gte('fecha', d)
-    .lte('fecha', h)
-    .order('fecha', { ascending: false })
+  const [ventasRes, devoluciones] = await Promise.all([
+    supabase
+      .from('ventas')
+      .select(`
+        id, fecha, total, metodo_pago, estado,
+        perfiles:cajero_id(nombre)
+      `)
+      .gte('fecha', d)
+      .lte('fecha', h)
+      .order('fecha', { ascending: false }),
+    fetchDevolucionesEnRango(new Date(d), new Date(h)),
+  ])
 
-  if (error) throw new Error(error.message)
+  if (ventasRes.error) throw new Error(ventasRes.error.message)
 
-  const filas: FilaReporte[] = (data ?? []).map((v) => ({
+  const filasVentas: FilaReporte[] = (ventasRes.data ?? []).map((v) => ({
     ticket: v.id.slice(0, 8).toUpperCase(),
     fecha: new Date(v.fecha).toLocaleString('es-PE'),
     cajero: (v.perfiles as unknown as { nombre: string } | null)?.nombre ?? '—',
@@ -45,7 +49,24 @@ export async function fetchReporteVentas(desde: string, hasta: string): Promise<
     estado: v.estado === 'anulada' ? 'Anulada' : 'Completada',
   }))
 
-  const suma = filas.reduce((s, f) => s + Number(f.total), 0)
+  const filasDevoluciones: FilaReporte[] = devoluciones.map((dev) => ({
+    ticket: dev.venta_id.slice(0, 8).toUpperCase(),
+    fecha: new Date(dev.fecha).toLocaleString('es-PE'),
+    cajero: '—',
+    metodo: 'Devolución',
+    total: Number(dev.total),
+    estado: 'Devolución',
+  }))
+
+  const filas = [...filasVentas, ...filasDevoluciones].sort(
+    (a, b) => new Date(String(b.fecha)).getTime() - new Date(String(a.fecha)).getTime(),
+  )
+
+  const ventasBrutas = filasVentas
+    .filter((f) => f.estado === 'Completada')
+    .reduce((s, f) => s + Number(f.total), 0)
+  const devolucionesTotal = totalDevoluciones(devoluciones)
+  const neto = Math.round((ventasBrutas - devolucionesTotal) * 100) / 100
 
   return {
     titulo: `Ventas del ${desde} al ${hasta}`,
@@ -58,26 +79,32 @@ export async function fetchReporteVentas(desde: string, hasta: string): Promise<
       { key: 'estado', label: 'Estado' },
     ],
     filas,
-    totales: { total: suma, label: `${filas.length} ventas · Total: ${formatMoney(suma)}` },
+    totales: {
+      total: neto,
+      label: `${filasVentas.filter((f) => f.estado === 'Completada').length} ventas · ${filasDevoluciones.length} devoluciones · Neto: ${formatMoney(neto)}`,
+    },
   }
 }
 
 export async function fetchReporteVentasPorProducto(desde: string, hasta: string): Promise<ReporteData> {
   const { desde: d, hasta: h } = rangoISO(desde, hasta)
 
-  const { data, error } = await supabase
-    .from('ventas')
-    .select(`
-      venta_detalles(nombre_producto, cantidad, precio_unitario, descuento)
-    `)
-    .eq('estado', 'completada')
-    .gte('fecha', d)
-    .lte('fecha', h)
+  const [ventasRes, devoluciones] = await Promise.all([
+    supabase
+      .from('ventas')
+      .select(`
+        venta_detalles(nombre_producto, cantidad, precio_unitario, descuento)
+      `)
+      .eq('estado', 'completada')
+      .gte('fecha', d)
+      .lte('fecha', h),
+    fetchDevolucionesEnRango(new Date(d), new Date(h)),
+  ])
 
-  if (error) throw new Error(error.message)
+  if (ventasRes.error) throw new Error(ventasRes.error.message)
 
   const map = new Map<string, { cantidad: number; monto: number }>()
-  for (const v of data ?? []) {
+  for (const v of ventasRes.data ?? []) {
     for (const det of v.venta_detalles ?? []) {
       const nombre = det.nombre_producto as string
       const cant = Number(det.cantidad)
@@ -89,7 +116,18 @@ export async function fetchReporteVentasPorProducto(desde: string, hasta: string
     }
   }
 
+  for (const dev of devoluciones) {
+    for (const det of dev.devolucion_detalles ?? []) {
+      const nombre = det.venta_detalles?.nombre_producto ?? 'Producto'
+      const ex = map.get(nombre) ?? { cantidad: 0, monto: 0 }
+      ex.cantidad -= Number(det.cantidad)
+      ex.monto -= Number(det.monto_devuelto)
+      map.set(nombre, ex)
+    }
+  }
+
   const filas: FilaReporte[] = [...map.entries()]
+    .filter(([, { cantidad, monto }]) => cantidad > 0 || monto > 0)
     .map(([producto, { cantidad, monto }]) => ({
       producto,
       cantidad: Math.round(cantidad * 1000) / 1000,
@@ -100,14 +138,14 @@ export async function fetchReporteVentasPorProducto(desde: string, hasta: string
   const totalMonto = filas.reduce((s, f) => s + Number(f.monto), 0)
 
   return {
-    titulo: `Ventas por producto (${desde} al ${hasta})`,
+    titulo: `Ventas netas por producto (${desde} al ${hasta})`,
     columnas: [
       { key: 'producto', label: 'Producto' },
       { key: 'cantidad', label: 'Cantidad' },
       { key: 'monto', label: 'Monto (S/)' },
     ],
     filas,
-    totales: { monto: totalMonto, label: `Total: ${formatMoney(totalMonto)}` },
+    totales: { monto: totalMonto, label: `Total neto: ${formatMoney(totalMonto)}` },
   }
 }
 

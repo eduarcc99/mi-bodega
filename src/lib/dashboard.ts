@@ -1,4 +1,10 @@
 import { supabase } from '@/lib/supabase'
+import {
+  fetchDevolucionesEnRango,
+  gananciaPerdidaDevoluciones,
+  totalDevoluciones,
+  type DevolucionEnRango,
+} from '@/lib/devoluciones'
 import { diasHastaVencimiento, productoVencido, stockBajo } from '@/lib/utils'
 import type { Producto } from '@/types/database'
 
@@ -117,7 +123,7 @@ export async function fetchKpis(): Promise<DashboardKpis> {
   const hoy = startOfDay()
   const fin = endOfDay()
 
-  const [ventasRes, productosRes] = await Promise.all([
+  const [ventasRes, productosRes, devoluciones] = await Promise.all([
     supabase
       .from('ventas')
       .select('id, total, venta_detalles(cantidad, precio_unitario, descuento, costo_unitario)')
@@ -128,6 +134,7 @@ export async function fetchKpis(): Promise<DashboardKpis> {
       .from('productos')
       .select('stock, stock_minimo, fecha_vencimiento, activo')
       .eq('activo', true),
+    fetchDevolucionesEnRango(hoy, fin),
   ])
 
   const ventas = ventasRes.data ?? []
@@ -136,7 +143,8 @@ export async function fetchKpis(): Promise<DashboardKpis> {
     'stock' | 'stock_minimo' | 'fecha_vencimiento' | 'activo'
   >[]
 
-  const ventasDia = ventas.reduce((s, v) => s + Number(v.total), 0)
+  const ventasBrutas = ventas.reduce((s, v) => s + Number(v.total), 0)
+  const ventasDia = Math.round((ventasBrutas - totalDevoluciones(devoluciones)) * 100) / 100
 
   let gananciaDia = 0
   for (const v of ventas) {
@@ -149,6 +157,7 @@ export async function fetchKpis(): Promise<DashboardKpis> {
       )
     }
   }
+  gananciaDia -= gananciaPerdidaDevoluciones(devoluciones)
 
   let stockBajoCount = 0
   let porVencer = 0
@@ -173,7 +182,28 @@ export async function fetchKpis(): Promise<DashboardKpis> {
   }
 }
 
-export function calcTopProductos(ventas: VentaConDetalles[], limit = 10): TopProducto[] {
+function restarDevolucionesProductos(
+  map: Map<string, TopProducto>,
+  devoluciones: DevolucionEnRango[],
+): void {
+  for (const dev of devoluciones) {
+    for (const d of dev.devolucion_detalles ?? []) {
+      const vd = d.venta_detalles
+      const nombre = vd?.nombre_producto ?? 'Producto'
+      const key = d.producto_id ?? vd?.producto_id ?? nombre
+      const existing = map.get(key) ?? { nombre, cantidad: 0, monto: 0 }
+      existing.cantidad -= Number(d.cantidad)
+      existing.monto -= Number(d.monto_devuelto)
+      map.set(key, existing)
+    }
+  }
+}
+
+export function calcTopProductos(
+  ventas: VentaConDetalles[],
+  devoluciones: DevolucionEnRango[] = [],
+  limit = 10,
+): TopProducto[] {
   const map = new Map<string, TopProducto>()
 
   for (const v of ventas) {
@@ -186,13 +216,19 @@ export function calcTopProductos(ventas: VentaConDetalles[], limit = 10): TopPro
     }
   }
 
+  restarDevolucionesProductos(map, devoluciones)
+
   return [...map.values()]
+    .filter((p) => p.cantidad > 0)
     .sort((a, b) => b.cantidad - a.cantidad)
     .slice(0, limit)
     .map((p) => ({ ...p, monto: Math.round(p.monto * 100) / 100 }))
 }
 
-export function calcVentasPorCategoria(ventas: VentaConDetalles[]): CategoriaVenta[] {
+export function calcVentasPorCategoria(
+  ventas: VentaConDetalles[],
+  devoluciones: DevolucionEnRango[] = [],
+): CategoriaVenta[] {
   const map = new Map<string, number>()
 
   for (const v of ventas) {
@@ -203,18 +239,30 @@ export function calcVentasPorCategoria(ventas: VentaConDetalles[]): CategoriaVen
     }
   }
 
-  const total = [...map.values()].reduce((s, v) => s + v, 0) || 1
+  for (const dev of devoluciones) {
+    for (const d of dev.devolucion_detalles ?? []) {
+      const cat = d.venta_detalles?.productos?.categorias?.nombre ?? 'Sin categoría'
+      map.set(cat, (map.get(cat) ?? 0) - Number(d.monto_devuelto))
+    }
+  }
+
+  const total = [...map.values()].reduce((s, v) => s + Math.max(0, v), 0) || 1
 
   return [...map.entries()]
+    .filter(([, monto]) => monto > 0)
     .map(([nombre, monto]) => ({
       nombre,
       monto: Math.round(monto * 100) / 100,
-      porcentaje: Math.round((monto / total) * 1000) / 10,
+      porcentaje: Math.round((Math.max(0, monto) / total) * 1000) / 10,
     }))
     .sort((a, b) => b.monto - a.monto)
 }
 
-export function calcTopGanancia(ventas: VentaConDetalles[], limit = 10): GananciaProducto[] {
+export function calcTopGanancia(
+  ventas: VentaConDetalles[],
+  devoluciones: DevolucionEnRango[] = [],
+  limit = 10,
+): GananciaProducto[] {
   const map = new Map<string, number>()
 
   for (const v of ventas) {
@@ -230,18 +278,36 @@ export function calcTopGanancia(ventas: VentaConDetalles[], limit = 10): Gananci
     }
   }
 
+  for (const dev of devoluciones) {
+    for (const d of dev.devolucion_detalles ?? []) {
+      const key = d.venta_detalles?.nombre_producto ?? 'Producto'
+      const costo = Number(d.venta_detalles?.costo_unitario ?? 0)
+      const gPerdida = Number(d.monto_devuelto) - costo * Number(d.cantidad)
+      map.set(key, (map.get(key) ?? 0) - gPerdida)
+    }
+  }
+
   return [...map.entries()]
+    .filter(([, ganancia]) => ganancia > 0)
     .map(([nombre, ganancia]) => ({ nombre, ganancia: Math.round(ganancia * 100) / 100 }))
     .sort((a, b) => b.ganancia - a.ganancia)
     .slice(0, limit)
 }
 
-export function calcVentasDiarias(ventas: VentaConDetalles[]): VentaDiaria[] {
+export function calcVentasDiarias(
+  ventas: VentaConDetalles[],
+  devoluciones: DevolucionEnRango[] = [],
+): VentaDiaria[] {
   const map = new Map<string, number>()
 
   for (const v of ventas) {
     const day = v.fecha.slice(0, 10)
     map.set(day, (map.get(day) ?? 0) + Number(v.total))
+  }
+
+  for (const dev of devoluciones) {
+    const day = dev.fecha.slice(0, 10)
+    map.set(day, (map.get(day) ?? 0) - Number(dev.total))
   }
 
   return [...map.entries()]
