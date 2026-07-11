@@ -166,7 +166,7 @@ export function DevolucionesPage() {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleBuscar()}
-          placeholder="Código del ticket (ej: A1B2C3D4) o Enter para ver recientes…"
+          placeholder="Código del ticket (ej: A1B2C3D4) o Enter para ver las últimas 10…"
           className="w-full rounded-xl border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
         />
       </div>
@@ -182,7 +182,7 @@ export function DevolucionesPage() {
       {!venta && ventasRecientes.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600">
-            Ventas recientes
+            Últimas 10 ventas
           </p>
           {ventasRecientes.map((v) => (
             <button

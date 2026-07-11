@@ -46,7 +46,7 @@ function montoLineaDevolucion(
 
 export async function buscarVentas(query: string): Promise<{ id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]> {
   const q = query.trim().toLowerCase()
-  if (!q) return []
+  if (!q) return fetchUltimasVentas(10)
 
   if (q.length >= 8) {
     const { data: byId } = await supabase
@@ -68,6 +68,20 @@ export async function buscarVentas(query: string): Promise<{ id: string; fecha: 
     .order('fecha', { ascending: false })
     .limit(20)
 
+  return (data ?? []) as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]
+}
+
+export async function fetchUltimasVentas(
+  limit = 10,
+): Promise<{ id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]> {
+  const { data, error } = await supabase
+    .from('ventas')
+    .select('id, fecha, total, metodo_pago')
+    .eq('estado', 'completada')
+    .order('fecha', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
   return (data ?? []) as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]
 }
 

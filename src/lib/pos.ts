@@ -97,10 +97,8 @@ export function mergeCartItems(items: CartItem[], newItem: CartItem): CartItem[]
         items[idx],
         items[idx].cantidad + newItem.cantidad,
       )
-      const copy = [...items]
-      copy[idx] = merged
-      return copy
+      return [merged, ...items.filter((_, i) => i !== idx)]
     }
   }
-  return [...items, newItem]
+  return [newItem, ...items]
 }

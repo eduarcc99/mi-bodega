@@ -9,9 +9,16 @@ import {
   X,
   Upload,
   Loader2,
+  Tags,
+  Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { uploadProductImage, getOptimizedImageUrl } from '@/lib/cloudinary'
+import {
+  crearCategoria,
+  actualizarCategoria,
+  eliminarCategoria,
+} from '@/lib/categorias'
 import {
   calcularPrecioVenta,
   formatMoney,
@@ -64,6 +71,13 @@ export function ProductosPage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
 
+  const [catModalOpen, setCatModalOpen] = useState(false)
+  const [catNombre, setCatNombre] = useState('')
+  const [catMargen, setCatMargen] = useState('25')
+  const [catEditId, setCatEditId] = useState<string | null>(null)
+  const [catError, setCatError] = useState('')
+  const [catSaving, setCatSaving] = useState(false)
+
   useEffect(() => {
     loadData()
   }, [])
@@ -88,6 +102,66 @@ export function ProductosPage() {
     setForm({ ...emptyForm, margen_pct: margen, categoria_id: categorias[0]?.id ?? '' })
     setError('')
     setModalOpen(true)
+  }
+
+  function openCatModal() {
+    setCatEditId(null)
+    setCatNombre('')
+    setCatMargen('25')
+    setCatError('')
+    setCatModalOpen(true)
+  }
+
+  function startEditCategoria(c: Categoria) {
+    setCatEditId(c.id)
+    setCatNombre(c.nombre)
+    setCatMargen(String(c.margen_default))
+    setCatError('')
+  }
+
+  async function handleGuardarCategoria() {
+    const margen = parseFloat(catMargen)
+    if (!catNombre.trim()) {
+      setCatError('Ingresa el nombre de la categoría')
+      return
+    }
+    if (isNaN(margen) || margen < 0 || margen >= 100) {
+      setCatError('Margen debe ser entre 0 y 99')
+      return
+    }
+    setCatSaving(true)
+    setCatError('')
+    try {
+      if (catEditId) {
+        await actualizarCategoria(catEditId, { nombre: catNombre, margen_default: margen })
+      } else {
+        await crearCategoria(catNombre, margen)
+      }
+      await loadData()
+      setCatEditId(null)
+      setCatNombre('')
+      setCatMargen('25')
+    } catch (e) {
+      setCatError(e instanceof Error ? e.message : 'Error al guardar categoría')
+    } finally {
+      setCatSaving(false)
+    }
+  }
+
+  async function handleEliminarCategoria(id: string) {
+    if (!confirm('¿Eliminar esta categoría? Los productos quedarán sin categoría.')) return
+    setCatError('')
+    try {
+      await eliminarCategoria(id)
+      await loadData()
+      if (catEditId === id) {
+        setCatEditId(null)
+        setCatNombre('')
+        setCatMargen('25')
+      }
+    } catch (e) {
+      setCatError(e instanceof Error ? e.message : 'No se pudo eliminar')
+    }
   }
 
   function openEdit(p: Producto) {
@@ -208,13 +282,22 @@ export function ProductosPage() {
           <h1 className="text-2xl font-bold text-slate-900">Productos</h1>
           <p className="text-slate-500">{productos.length} productos registrados</p>
         </div>
-        <button
-          onClick={openNew}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-4 py-2.5 font-medium text-white hover:bg-teal-700"
-        >
-          <Plus className="h-5 w-5" />
-          Nuevo producto
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={openCatModal}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Tags className="h-5 w-5" />
+            Categorías
+          </button>
+          <button
+            onClick={openNew}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-4 py-2.5 font-medium text-white hover:bg-teal-700"
+          >
+            <Plus className="h-5 w-5" />
+            Nuevo producto
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -495,6 +578,92 @@ export function ProductosPage() {
                 {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Registrar producto'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {catModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Categorías</h2>
+              <button onClick={() => setCatModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-slate-500">
+              Crea categorías como Licores, Fiambres, etc. El margen % se aplica al registrar productos nuevos.
+            </p>
+
+            <div className="mb-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-medium text-slate-600">
+                {catEditId ? 'Editar categoría' : 'Nueva categoría'}
+              </p>
+              <input
+                value={catNombre}
+                onChange={(e) => setCatNombre(e.target.value)}
+                placeholder="Nombre (ej: Licores)"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="99"
+                  step="0.1"
+                  value={catMargen}
+                  onChange={(e) => setCatMargen(e.target.value)}
+                  placeholder="Margen %"
+                  className="w-28 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+                />
+                <button
+                  onClick={handleGuardarCategoria}
+                  disabled={catSaving}
+                  className="flex-1 rounded-lg bg-teal-600 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {catSaving ? 'Guardando…' : catEditId ? 'Actualizar' : 'Agregar'}
+                </button>
+                {catEditId && (
+                  <button
+                    onClick={() => {
+                      setCatEditId(null)
+                      setCatNombre('')
+                      setCatMargen('25')
+                    }}
+                    className="rounded-lg border border-slate-200 px-3 text-sm text-slate-600"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {catError && <p className="mb-3 text-sm text-red-600">{catError}</p>}
+
+            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+              {categorias.map((c) => (
+                <li key={c.id} className="flex items-center justify-between px-3 py-2.5">
+                  <div>
+                    <p className="font-medium text-slate-900">{c.nombre}</p>
+                    <p className="text-xs text-slate-500">Margen {c.margen_default}%</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => startEditCategoria(c)}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-teal-600"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEliminarCategoria(c.id)}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       )}

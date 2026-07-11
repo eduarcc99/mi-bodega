@@ -34,8 +34,10 @@ export function PosPage() {
   const [resultados, setResultados] = useState<Producto[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
   const [error, setError] = useState('')
+  const [avisoBusqueda, setAvisoBusqueda] = useState('')
   const [processing, setProcessing] = useState(false)
   const [ventaCompletada, setVentaCompletada] = useState<VentaCompletada | null>(null)
+  const [flashAgregado, setFlashAgregado] = useState('')
 
   const [showGeneric, setShowGeneric] = useState(false)
   const [genericNombre, setGenericNombre] = useState('')
@@ -54,28 +56,43 @@ export function PosPage() {
     focusSearch()
   }, [focusSearch])
 
+  useEffect(() => {
+    if (!flashAgregado) return
+    const t = setTimeout(() => setFlashAgregado(''), 1200)
+    return () => clearTimeout(t)
+  }, [flashAgregado])
+
+  function mostrarAgregado(nombre: string) {
+    setFlashAgregado(nombre)
+  }
+
   async function handleSearch(query?: string) {
     const q = (query ?? busqueda).trim()
     if (!q) return
     setError('')
+    setAvisoBusqueda('')
 
     const productos = await buscarProductos(q)
 
-    if (productos.length === 1) {
-      addProducto(productos[0])
+    const exactos = productos.filter((p) => p.nombre.toLowerCase() === q.toLowerCase())
+    const unico = exactos.length === 1 ? exactos[0] : productos.length === 1 ? productos[0] : null
+
+    if (unico) {
+      addProducto(unico)
       setBusqueda('')
       setResultados([])
       return
     }
 
-    if (productos.length > 1) {
+    if (productos.length > 0) {
       setResultados(productos)
       return
     }
 
     setResultados([])
-    setGenericNombre(q)
-    setShowGeneric(true)
+    setAvisoBusqueda(
+      `No encontramos productos con "${q}". Revisa el nombre o usa el botón Venta genérica si no está en el catálogo.`,
+    )
   }
 
   function addProducto(producto: Producto) {
@@ -94,6 +111,7 @@ export function PosPage() {
     const item = productoFromCart(producto, 1)
     setCart((prev) => mergeCartItems(prev, item))
     setError('')
+    mostrarAgregado(producto.nombre)
     focusSearch()
   }
 
@@ -103,7 +121,9 @@ export function PosPage() {
       setError('Ingresa nombre y precio válido')
       return
     }
-    setCart((prev) => [...prev, genericCartItem(genericNombre.trim(), precio)])
+    const nombre = genericNombre.trim()
+    setCart((prev) => [genericCartItem(nombre, precio), ...prev])
+    mostrarAgregado(nombre)
     setShowGeneric(false)
     setGenericNombre('')
     setGenericPrecio('')
@@ -208,6 +228,7 @@ export function PosPage() {
           onChange={(e) => {
             setBusqueda(e.target.value)
             setResultados([])
+            setAvisoBusqueda('')
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -219,6 +240,18 @@ export function PosPage() {
           className="w-full rounded-xl border-2 border-teal-200 bg-white py-4 pl-14 pr-4 text-lg outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
         />
       </div>
+
+      {avisoBusqueda && (
+        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {avisoBusqueda}
+        </div>
+      )}
+
+      {flashAgregado && (
+        <div className="rounded-lg bg-emerald-500 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-md animate-pulse">
+          ✓ {flashAgregado} agregado
+        </div>
+      )}
 
       {resultados.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -260,7 +293,11 @@ export function PosPage() {
               Carrito ({cart.length})
             </h2>
             <button
-              onClick={() => setShowGeneric(true)}
+              onClick={() => {
+              setGenericNombre('')
+              setGenericPrecio('')
+              setShowGeneric(true)
+            }}
               className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700"
             >
               <PackagePlus className="h-4 w-4" />
