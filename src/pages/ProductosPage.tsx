@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
   Plus,
   Search,
@@ -11,6 +11,8 @@ import {
   Loader2,
   Tags,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { uploadProductImage, getOptimizedImageUrl } from '@/lib/cloudinary'
@@ -61,11 +63,47 @@ function recalcPrecioVenta(costo: string, margen: string): string {
   return String(calcularPrecioVenta(c, parseNum(margen, 25)))
 }
 
+const PAGE_SIZE = 20
+
+function ProductoThumbnail({ producto }: { producto: Producto }) {
+  if (producto.imagen_url) {
+    return (
+      <img
+        src={getOptimizedImageUrl(producto.imagen_url, 48)}
+        alt=""
+        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+      />
+    )
+  }
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+      <Package className="h-5 w-5 text-slate-400" />
+    </div>
+  )
+}
+
+function EstadoProducto({ producto }: { producto: Producto }) {
+  const vencido = productoVencido(producto.fecha_vencimiento)
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+        !producto.activo || vencido
+          ? 'bg-red-100 text-red-700'
+          : 'bg-emerald-100 text-emerald-700'
+      }`}
+    >
+      {!producto.activo ? 'Inactivo' : vencido ? 'Vencido' : 'Activo'}
+    </span>
+  )
+}
+
 export function ProductosPage() {
   const { canSeeFinancials } = useAuth()
   const [productos, setProductos] = useState<Producto[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [busqueda, setBusqueda] = useState('')
+  const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [pagina, setPagina] = useState(1)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -84,6 +122,10 @@ export function ProductosPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    setPagina(1)
+  }, [busqueda, filtroCategoria])
 
   async function loadData() {
     setLoading(true)
@@ -284,11 +326,134 @@ export function ProductosPage() {
     setSaving(false)
   }
 
-  const filtrados = productos.filter(
-    (p) =>
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.codigo_barra?.includes(busqueda),
+  const filtrados = useMemo(
+    () =>
+      productos.filter((p) => {
+        const q = busqueda.toLowerCase().trim()
+        const matchBusqueda =
+          !q ||
+          p.nombre.toLowerCase().includes(q) ||
+          (p.codigo_barra?.toLowerCase().includes(q) ?? false)
+        const matchCategoria = !filtroCategoria || p.categoria_id === filtroCategoria
+        return matchBusqueda && matchCategoria
+      }),
+    [productos, busqueda, filtroCategoria],
   )
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
+  const paginaActual = Math.min(pagina, totalPaginas)
+  const paginados = filtrados.slice(
+    (paginaActual - 1) * PAGE_SIZE,
+    paginaActual * PAGE_SIZE,
+  )
+  const desde = filtrados.length === 0 ? 0 : (paginaActual - 1) * PAGE_SIZE + 1
+  const hasta = Math.min(paginaActual * PAGE_SIZE, filtrados.length)
+
+  function renderFilaProducto(p: Producto) {
+    const dias = diasHastaVencimiento(p.fecha_vencimiento)
+    const vencido = productoVencido(p.fecha_vencimiento)
+    const bajo = stockBajo(p.stock, p.stock_minimo)
+
+    return (
+      <tr key={p.id} className="hover:bg-slate-50">
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-3">
+            <ProductoThumbnail producto={p} />
+            <div>
+              <p className="font-medium text-slate-900">{p.nombre}</p>
+              <p className="text-xs text-slate-400">
+                {p.categorias?.nombre ?? 'Sin categoría'}
+                {p.codigo_barra && ` · ${p.codigo_barra}`}
+              </p>
+            </div>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <span className={bajo ? 'font-semibold text-amber-600' : 'text-slate-700'}>
+            {p.stock} {p.unidad}
+          </span>
+          {bajo && <AlertTriangle className="ml-1 inline h-4 w-4 text-amber-500" />}
+        </td>
+        <td className="px-4 py-3 font-medium text-slate-900">{formatMoney(p.precio_venta)}</td>
+        {canSeeFinancials && (
+          <td className="px-4 py-3 text-slate-600">{formatMoney(p.costo)}</td>
+        )}
+        <td className="px-4 py-3">
+          {p.fecha_vencimiento ? (
+            <span
+              className={
+                vencido
+                  ? 'text-red-600'
+                  : dias !== null && dias <= 15
+                    ? 'text-orange-600'
+                    : 'text-slate-600'
+              }
+            >
+              {formatDate(p.fecha_vencimiento)}
+              {dias !== null && dias <= 15 && <Clock className="ml-1 inline h-3.5 w-3.5" />}
+            </span>
+          ) : (
+            '—'
+          )}
+        </td>
+        <td className="px-4 py-3">
+          <EstadoProducto producto={p} />
+        </td>
+        <td className="px-4 py-3">
+          <button
+            onClick={() => openEdit(p)}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-teal-600"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderCardProducto(p: Producto) {
+    const bajo = stockBajo(p.stock, p.stock_minimo)
+    const dias = diasHastaVencimiento(p.fecha_vencimiento)
+    const vencido = productoVencido(p.fecha_vencimiento)
+
+    return (
+      <div
+        key={p.id}
+        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+      >
+        <ProductoThumbnail producto={p} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-slate-900">{p.nombre}</p>
+          <p className="text-sm font-semibold text-teal-700">{formatMoney(p.precio_venta)}</p>
+          <p className="text-xs text-slate-500">
+            <span className={bajo ? 'font-semibold text-amber-600' : ''}>
+              {p.stock} {p.unidad}
+            </span>
+            {' · '}
+            {p.categorias?.nombre ?? 'Sin categoría'}
+          </p>
+          {p.fecha_vencimiento && (
+            <p
+              className={`text-xs ${
+                vencido ? 'text-red-600' : dias !== null && dias <= 15 ? 'text-orange-600' : 'text-slate-400'
+              }`}
+            >
+              Vence: {formatDate(p.fecha_vencimiento)}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <EstadoProducto producto={p} />
+          <button
+            onClick={() => openEdit(p)}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-teal-600"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -315,119 +480,109 @@ export function ProductosPage() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-        <input
-          type="search"
-          placeholder="Buscar por nombre o código de barras…"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-10 pr-4 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-        />
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            placeholder="Buscar por nombre o código de barras…"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white py-3 pl-10 pr-4 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+          />
+        </div>
+        <select
+          value={filtroCategoria}
+          onChange={(e) => setFiltroCategoria(e.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-teal-500 sm:w-52"
+        >
+          <option value="">Todas las categorías</option>
+          {categorias.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
         </div>
-      ) : filtrados.length === 0 ? (
+      ) : productos.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white py-16 text-center">
           <Package className="mx-auto h-12 w-12 text-slate-300" />
           <p className="mt-4 font-medium text-slate-600">No hay productos</p>
           <p className="text-sm text-slate-400">Registra tu primer producto para empezar</p>
         </div>
+      ) : filtrados.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white py-16 text-center">
+          <Search className="mx-auto h-12 w-12 text-slate-300" />
+          <p className="mt-4 font-medium text-slate-600">Sin coincidencias</p>
+          <p className="text-sm text-slate-400">
+            Prueba otro nombre, código o categoría
+          </p>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50 text-left text-slate-600">
-              <tr>
-                <th className="px-4 py-3 font-medium">Producto</th>
-                <th className="px-4 py-3 font-medium">Stock</th>
-                <th className="px-4 py-3 font-medium">Precio venta</th>
-                {canSeeFinancials && <th className="px-4 py-3 font-medium">Costo</th>}
-                <th className="px-4 py-3 font-medium">Vencimiento</th>
-                <th className="px-4 py-3 font-medium">Estado</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtrados.map((p) => {
-                const dias = diasHastaVencimiento(p.fecha_vencimiento)
-                const vencido = productoVencido(p.fecha_vencimiento)
-                const bajo = stockBajo(p.stock, p.stock_minimo)
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            {filtrados.length === productos.length
+              ? `${productos.length} productos`
+              : `${filtrados.length} de ${productos.length} productos`}
+            {filtrados.length > PAGE_SIZE &&
+              ` · mostrando ${desde}–${hasta}`}
+          </p>
 
-                return (
-                  <tr key={p.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {p.imagen_url ? (
-                          <img
-                            src={getOptimizedImageUrl(p.imagen_url, 48)}
-                            alt=""
-                            className="h-10 w-10 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                            <Package className="h-5 w-5 text-slate-400" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-slate-900">{p.nombre}</p>
-                          <p className="text-xs text-slate-400">
-                            {p.categorias?.nombre ?? 'Sin categoría'}
-                            {p.codigo_barra && ` · ${p.codigo_barra}`}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={bajo ? 'font-semibold text-amber-600' : 'text-slate-700'}>
-                        {p.stock} {p.unidad}
-                      </span>
-                      {bajo && <AlertTriangle className="ml-1 inline h-4 w-4 text-amber-500" />}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {formatMoney(p.precio_venta)}
-                    </td>
-                    {canSeeFinancials && (
-                      <td className="px-4 py-3 text-slate-600">{formatMoney(p.costo)}</td>
-                    )}
-                    <td className="px-4 py-3">
-                      {p.fecha_vencimiento ? (
-                        <span className={vencido ? 'text-red-600' : dias !== null && dias <= 15 ? 'text-orange-600' : 'text-slate-600'}>
-                          {formatDate(p.fecha_vencimiento)}
-                          {dias !== null && dias <= 15 && (
-                            <Clock className="ml-1 inline h-3.5 w-3.5" />
-                          )}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          !p.activo || vencido
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-emerald-100 text-emerald-700'
-                        }`}
-                      >
-                        {!p.activo ? 'Inactivo' : vencido ? 'Vencido' : 'Activo'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-teal-600"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                    </td>
+          <div className="space-y-2 md:hidden">{paginados.map(renderCardProducto)}</div>
+
+          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
+            <div className="max-h-[calc(100vh-22rem)] overflow-y-auto overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 text-left text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Producto</th>
+                    <th className="px-4 py-3 font-medium">Stock</th>
+                    <th className="px-4 py-3 font-medium">Precio venta</th>
+                    {canSeeFinancials && <th className="px-4 py-3 font-medium">Costo</th>}
+                    <th className="px-4 py-3 font-medium">Vencimiento</th>
+                    <th className="px-4 py-3 font-medium">Estado</th>
+                    <th className="px-4 py-3" />
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginados.map(renderFilaProducto)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {filtrados.length > PAGE_SIZE && (
+            <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row">
+              <p className="text-sm text-slate-600">
+                Página {paginaActual} de {totalPaginas}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                  disabled={paginaActual <= 1}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                  disabled={paginaActual >= totalPaginas}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
