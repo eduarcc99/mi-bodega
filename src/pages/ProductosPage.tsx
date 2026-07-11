@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react'
 import {
   Plus,
   Search,
@@ -13,6 +13,7 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Camera,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { uploadProductImage, getOptimizedImageUrl } from '@/lib/cloudinary'
@@ -31,6 +32,10 @@ import {
 } from '@/lib/utils'
 import type { Categoria, Producto, ProductoForm, UnidadMedida } from '@/types/database'
 import { useAuth } from '@/contexts/AuthContext'
+
+const CameraScannerModal = lazy(() =>
+  import('@/components/pos/CameraScannerModal').then((m) => ({ default: m.CameraScannerModal })),
+)
 
 const emptyForm: ProductoForm = {
   codigo_barra: '',
@@ -106,6 +111,7 @@ export function ProductosPage() {
   const [pagina, setPagina] = useState(1)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [showCameraScanner, setShowCameraScanner] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<ProductoForm>(emptyForm)
   const [saving, setSaving] = useState(false)
@@ -251,6 +257,11 @@ export function ProductosPage() {
       }
       return next
     })
+  }
+
+  function handleCameraScan(code: string) {
+    setShowCameraScanner(false)
+    updateForm('codigo_barra', code.trim())
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -610,11 +621,22 @@ export function ProductosPage() {
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="mb-1 block text-sm font-medium text-slate-700">Código de barras</label>
-                  <input
-                    value={form.codigo_barra}
-                    onChange={(e) => updateForm('codigo_barra', e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      value={form.codigo_barra}
+                      onChange={(e) => updateForm('codigo_barra', e.target.value)}
+                      className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"
+                      placeholder="Escanea o escribe"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCameraScanner(true)}
+                      className="flex shrink-0 items-center justify-center rounded-lg border border-slate-300 px-3 text-teal-700 hover:bg-teal-50"
+                      title="Escanear con cámara"
+                    >
+                      <Camera className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -890,6 +912,21 @@ export function ProductosPage() {
             </ul>
           </div>
         </div>
+      )}
+
+      {showCameraScanner && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+              <Loader2 className="h-10 w-10 animate-spin text-white" />
+            </div>
+          }
+        >
+          <CameraScannerModal
+            onScan={handleCameraScan}
+            onClose={() => setShowCameraScanner(false)}
+          />
+        </Suspense>
       )}
     </div>
   )
