@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase'
 import {
-  fetchDevolucionesEnRango,
   gananciaPerdidaDevoluciones,
   totalDevoluciones,
   type DevolucionEnRango,
@@ -10,12 +9,26 @@ import type { Producto } from '@/types/database'
 
 export type PeriodoFiltro = 'hoy' | 'semana' | 'mes'
 
-export interface DashboardKpis {
-  ventasDia: number
-  gananciaDia: number
+export interface KpisInventario {
   stockBajo: number
   porVencer: number
   vencidos: number
+}
+
+export interface KpisPeriodo {
+  ventasNetas: number
+  gananciaNeta: number
+}
+
+export function getEtiquetasKpi(periodo: PeriodoFiltro): { ventas: string; ganancia: string } {
+  switch (periodo) {
+    case 'hoy':
+      return { ventas: 'Ventas netas del día', ganancia: 'Ganancia neta hoy' }
+    case 'semana':
+      return { ventas: 'Ventas netas de la semana', ganancia: 'Ganancia neta de la semana' }
+    case 'mes':
+      return { ventas: 'Ventas netas del mes', ganancia: 'Ganancia neta del mes' }
+  }
 }
 
 export interface TopProducto {
@@ -119,37 +132,17 @@ export async function fetchVentasEnRango(desde: Date, hasta: Date): Promise<Vent
   return (data as unknown as VentaConDetalles[]) ?? []
 }
 
-export async function fetchKpis(): Promise<DashboardKpis> {
-  const hoy = startOfDay()
-  const fin = endOfDay()
-
-  const [ventasRes, productosRes, devoluciones] = await Promise.all([
-    supabase
-      .from('ventas')
-      .select('id, total, venta_detalles(cantidad, precio_unitario, descuento, costo_unitario)')
-      .eq('estado', 'completada')
-      .gte('fecha', hoy.toISOString())
-      .lte('fecha', fin.toISOString()),
-    supabase
-      .from('productos')
-      .select('stock, stock_minimo, fecha_vencimiento, activo')
-      .eq('activo', true),
-    fetchDevolucionesEnRango(hoy, fin),
-  ])
-
-  const ventas = ventasRes.data ?? []
-  const productos = (productosRes.data ?? []) as Pick<
-    Producto,
-    'stock' | 'stock_minimo' | 'fecha_vencimiento' | 'activo'
-  >[]
-
+export function calcKpisPeriodo(
+  ventas: VentaConDetalles[],
+  devoluciones: DevolucionEnRango[] = [],
+): KpisPeriodo {
   const ventasBrutas = ventas.reduce((s, v) => s + Number(v.total), 0)
-  const ventasDia = Math.round((ventasBrutas - totalDevoluciones(devoluciones)) * 100) / 100
+  const ventasNetas = Math.round((ventasBrutas - totalDevoluciones(devoluciones)) * 100) / 100
 
-  let gananciaDia = 0
+  let gananciaNeta = 0
   for (const v of ventas) {
     for (const d of v.venta_detalles ?? []) {
-      gananciaDia += lineaGanancia(
+      gananciaNeta += lineaGanancia(
         Number(d.cantidad),
         Number(d.precio_unitario),
         Number(d.descuento),
@@ -157,7 +150,24 @@ export async function fetchKpis(): Promise<DashboardKpis> {
       )
     }
   }
-  gananciaDia -= gananciaPerdidaDevoluciones(devoluciones)
+  gananciaNeta -= gananciaPerdidaDevoluciones(devoluciones)
+
+  return {
+    ventasNetas,
+    gananciaNeta: Math.round(gananciaNeta * 100) / 100,
+  }
+}
+
+export async function fetchKpisInventario(): Promise<KpisInventario> {
+  const { data: productosRes } = await supabase
+    .from('productos')
+    .select('stock, stock_minimo, fecha_vencimiento, activo')
+    .eq('activo', true)
+
+  const productos = (productosRes ?? []) as Pick<
+    Producto,
+    'stock' | 'stock_minimo' | 'fecha_vencimiento' | 'activo'
+  >[]
 
   let stockBajoCount = 0
   let porVencer = 0
@@ -173,13 +183,7 @@ export async function fetchKpis(): Promise<DashboardKpis> {
     }
   }
 
-  return {
-    ventasDia,
-    gananciaDia: Math.round(gananciaDia * 100) / 100,
-    stockBajo: stockBajoCount,
-    porVencer,
-    vencidos,
-  }
+  return { stockBajo: stockBajoCount, porVencer, vencidos }
 }
 
 function restarDevolucionesProductos(

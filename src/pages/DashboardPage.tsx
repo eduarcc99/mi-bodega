@@ -12,14 +12,17 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatMoney } from '@/lib/utils'
 import {
   type PeriodoFiltro,
-  type DashboardKpis,
+  type KpisInventario,
+  type KpisPeriodo,
   type Alerta,
   type VencimientoResumen,
-  fetchKpis,
+  fetchKpisInventario,
   fetchVentasEnRango,
   fetchAlertas,
   fetchMapaVencimientos,
   getRangoPeriodo,
+  getEtiquetasKpi,
+  calcKpisPeriodo,
   calcTopProductos,
   calcVentasPorCategoria,
   calcTopGanancia,
@@ -57,7 +60,8 @@ export function DashboardPage() {
   const { perfil } = useAuth()
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('semana')
   const [loading, setLoading] = useState(true)
-  const [kpis, setKpis] = useState<DashboardKpis | null>(null)
+  const [kpisPeriodo, setKpisPeriodo] = useState<KpisPeriodo | null>(null)
+  const [kpisInventario, setKpisInventario] = useState<KpisInventario | null>(null)
   const [alertas, setAlertas] = useState<Alerta[]>([])
 
   const [topProductos, setTopProductos] = useState<ReturnType<typeof calcTopProductos>>([])
@@ -70,15 +74,16 @@ export function DashboardPage() {
     setLoading(true)
     try {
       const { desde, hasta } = getRangoPeriodo(periodo)
-      const [kpiData, ventas, devoluciones, alertasData, vencData] = await Promise.all([
-        fetchKpis(),
+      const [inventario, ventas, devoluciones, alertasData, vencData] = await Promise.all([
+        fetchKpisInventario(),
         fetchVentasEnRango(desde, hasta),
         fetchDevolucionesEnRango(desde, hasta),
         fetchAlertas(),
         fetchMapaVencimientos(),
       ])
 
-      setKpis(kpiData)
+      setKpisInventario(inventario)
+      setKpisPeriodo(calcKpisPeriodo(ventas, devoluciones))
       setAlertas(alertasData)
       setVencimientos(vencData)
       setTopProductos(calcTopProductos(ventas, devoluciones))
@@ -96,19 +101,36 @@ export function DashboardPage() {
     loadData()
   }, [periodo])
 
-  const kpiCards = kpis
-    ? [
-        { label: 'Ventas netas del día', value: formatMoney(kpis.ventasDia), icon: TrendingUp, color: 'bg-blue-500' },
-        { label: 'Ganancia neta hoy', value: formatMoney(kpis.gananciaDia), icon: DollarSign, color: 'bg-emerald-500' },
-        { label: 'Stock bajo', value: `${kpis.stockBajo} productos`, icon: AlertTriangle, color: 'bg-amber-500' },
-        {
-          label: 'Por vencer / vencidos',
-          value: `${kpis.porVencer} / ${kpis.vencidos}`,
-          icon: Clock,
-          color: 'bg-orange-500',
-        },
-      ]
-    : []
+  const etiquetas = getEtiquetasKpi(periodo)
+  const kpiCards =
+    kpisPeriodo && kpisInventario
+      ? [
+          {
+            label: etiquetas.ventas,
+            value: formatMoney(kpisPeriodo.ventasNetas),
+            icon: TrendingUp,
+            color: 'bg-blue-500',
+          },
+          {
+            label: etiquetas.ganancia,
+            value: formatMoney(kpisPeriodo.gananciaNeta),
+            icon: DollarSign,
+            color: 'bg-emerald-500',
+          },
+          {
+            label: 'Stock bajo',
+            value: `${kpisInventario.stockBajo} productos`,
+            icon: AlertTriangle,
+            color: 'bg-amber-500',
+          },
+          {
+            label: 'Por vencer / vencidos',
+            value: `${kpisInventario.porVencer} / ${kpisInventario.vencidos}`,
+            icon: Clock,
+            color: 'bg-orange-500',
+          },
+        ]
+      : []
 
   return (
     <div className="space-y-6">
@@ -142,7 +164,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {loading && !kpis ? (
+      {loading && !kpisPeriodo ? (
         <div className="flex justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
         </div>
