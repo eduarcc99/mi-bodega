@@ -48,9 +48,6 @@ export function TiendaPage() {
         <h2 className="text-xl font-bold text-slate-900">Estamos cerrados</h2>
         <p className="mt-2 text-slate-600">{proximaApertura()}</p>
         <p className="mt-1 text-sm text-slate-400">{mensajeHorario()}</p>
-        <p className="mt-6 text-xs text-slate-400">
-          Delivery solo en {TIENDA_CONFIG.zona} · comparte el link del grupo
-        </p>
       </div>
     )
   }

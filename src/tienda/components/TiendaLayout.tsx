@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { ShoppingBag, MapPin, Clock, ArrowLeft } from 'lucide-react'
 import { TIENDA_CONFIG } from '@/tienda/config'
-import { mensajeHorario, isTiendaAbierta } from '@/tienda/lib/horario'
+import { mensajeHorario, mensajeHorarioHoy, isTiendaAbierta } from '@/tienda/lib/horario'
 import { totalConDelivery } from '@/tienda/lib/delivery'
 import { useTiendaCart } from '@/tienda/context/TiendaCartContext'
 import { formatMoney } from '@/lib/utils'
@@ -40,7 +40,9 @@ export function TiendaLayout() {
                 }`}
               >
                 <Clock className="h-3.5 w-3.5" />
-                {abierta ? `Abierto · ${mensajeHorario()}` : `Cerrado · ${mensajeHorario()}`}
+                {abierta
+                  ? `Abierto · ${mensajeHorarioHoy()}`
+                  : `Cerrado · ${mensajeHorario()}`}
               </div>
               {abierta && (
                 <p className="mt-2 text-xs text-rose-200/90">{TIENDA_CONFIG.promoEnvio}</p>
