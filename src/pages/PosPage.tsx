@@ -26,6 +26,9 @@ import {
   permiteVentaUnidadSuelta,
   stockNecesario,
   etiquetaCantidadItem,
+  loadCartFromStorage,
+  saveCartToStorage,
+  clearCartStorage,
 } from '@/lib/pos'
 import { buscarProductos, completarVenta, validateProductoParaVenta } from '@/lib/ventas'
 import { formatMoney } from '@/lib/utils'
@@ -45,6 +48,7 @@ export function PosPage() {
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<Producto[]>([])
   const [cart, setCart] = useState<CartItem[]>([])
+  const [cartReady, setCartReady] = useState(false)
   const [error, setError] = useState('')
   const [avisoBusqueda, setAvisoBusqueda] = useState('')
   const [processing, setProcessing] = useState(false)
@@ -71,10 +75,33 @@ export function PosPage() {
   }, [focusSearch])
 
   useEffect(() => {
+    if (!perfil?.id) {
+      setCartReady(false)
+      return
+    }
+    setCart(loadCartFromStorage(perfil.id))
+    setCartReady(true)
+  }, [perfil?.id])
+
+  useEffect(() => {
+    if (!perfil?.id || !cartReady) return
+    saveCartToStorage(perfil.id, cart)
+  }, [cart, perfil?.id, cartReady])
+
+  useEffect(() => {
     if (!flashAgregado) return
     const t = setTimeout(() => setFlashAgregado(''), 1200)
     return () => clearTimeout(t)
   }, [flashAgregado])
+
+  function vaciarCarrito() {
+    if (cart.length === 0) return
+    if (!window.confirm('¿Vaciar el carrito? Se quitarán todos los productos agregados.')) return
+    setCart([])
+    setError('')
+    if (perfil?.id) clearCartStorage(perfil.id)
+    focusSearch()
+  }
 
   function mostrarAgregado(nombre: string) {
     setFlashAgregado(nombre)
@@ -379,17 +406,27 @@ export function PosPage() {
               <ShoppingCart className="h-5 w-5" />
               Carrito ({cart.length})
             </h2>
-            <button
-              onClick={() => {
-                setGenericNombre('')
-                setGenericPrecio('')
-                setShowGeneric(true)
-              }}
-              className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700"
-            >
-              <PackagePlus className="h-4 w-4" />
-              Venta genérica
-            </button>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => {
+                  setGenericNombre('')
+                  setGenericPrecio('')
+                  setShowGeneric(true)
+                }}
+                className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700"
+              >
+                <PackagePlus className="h-4 w-4" />
+                Venta genérica
+              </button>
+              <button
+                onClick={vaciarCarrito}
+                disabled={cart.length === 0}
+                className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Trash2 className="h-4 w-4" />
+                Vaciar carrito
+              </button>
+            </div>
           </div>
 
           {cart.length === 0 ? (

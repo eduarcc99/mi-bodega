@@ -168,3 +168,37 @@ export function stockNecesario(item: CartItem, cantidadExtra = 0): number {
   }
   return totalCant
 }
+
+const CART_STORAGE_PREFIX = 'mi-bodega-pos-cart'
+
+export function cartStorageKey(cajeroId: string): string {
+  return `${CART_STORAGE_PREFIX}:${cajeroId}`
+}
+
+export function loadCartFromStorage(cajeroId: string): CartItem[] {
+  try {
+    const raw = sessionStorage.getItem(cartStorageKey(cajeroId))
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed as CartItem[]
+  } catch {
+    return []
+  }
+}
+
+export function saveCartToStorage(cajeroId: string, items: CartItem[]): void {
+  try {
+    if (items.length === 0) {
+      sessionStorage.removeItem(cartStorageKey(cajeroId))
+    } else {
+      sessionStorage.setItem(cartStorageKey(cajeroId), JSON.stringify(items))
+    }
+  } catch {
+    // Ignorar si el navegador bloquea storage
+  }
+}
+
+export function clearCartStorage(cajeroId: string): void {
+  sessionStorage.removeItem(cartStorageKey(cajeroId))
+}
