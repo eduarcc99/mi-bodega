@@ -31,6 +31,7 @@ export function CierreCajaPage() {
   const [fechaCaja, setFechaCaja] = useState(todayLocalISO())
   const [efectivoInicialManual, setEfectivoInicialManual] = useState<string>('')
   const [efectivoDeclarado, setEfectivoDeclarado] = useState('')
+  const [yapeDeclarado, setYapeDeclarado] = useState('')
   const [notas, setNotas] = useState('')
   const [cerrando, setCerrando] = useState(false)
   const [mensaje, setMensaje] = useState('')
@@ -48,6 +49,10 @@ export function CierreCajaPage() {
       setResumen(data)
       if (!efectivoInicialManual && data.efectivoInicial > 0) {
         setEfectivoInicialManual(String(data.efectivoInicial))
+      }
+      if (data.cierreExistente) {
+        setEfectivoDeclarado(String(data.cierreExistente.efectivo_declarado))
+        setYapeDeclarado(String(data.cierreExistente.yape_declarado))
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar caja')
@@ -67,9 +72,16 @@ export function CierreCajaPage() {
   const devolucionesEfectivo = resumen?.movimientos
     .filter((m) => m.tipo === 'devolucion' && m.afectaCaja)
     .reduce((s, m) => s + m.monto, 0) ?? 0
+  const devolucionesYape = resumen?.devolucionesYape ?? 0
+  const yapeEsperado = resumen?.yapeEsperado ?? 0
   const efectivoEsperado = Math.round((efectivoInicial + ventasEfectivo - totalGastos - devolucionesEfectivo) * 100) / 100
   const declarado = parseFloat(efectivoDeclarado) || 0
+  const yapeContado = parseFloat(yapeDeclarado) || 0
   const diferencia = Math.round((declarado - efectivoEsperado) * 100) / 100
+  const diferenciaYape = Math.round((yapeContado - yapeEsperado) * 100) / 100
+  const requiereYape = yapeEsperado > 0
+  const puedeCerrar =
+    declarado > 0 && (!requiereYape || yapeDeclarado.trim() !== '')
 
   async function handleGasto() {
     if (!perfil) return
@@ -102,6 +114,10 @@ export function CierreCajaPage() {
       setError('Cuenta el efectivo que tienes en caja e ingrésalo')
       return
     }
+    if (requiereYape && yapeDeclarado.trim() === '') {
+      setError('Revisa tu app Yape e ingresa cuánto tienes hoy')
+      return
+    }
     setCerrando(true)
     setError('')
     try {
@@ -115,6 +131,8 @@ export function CierreCajaPage() {
         total_gastos: totalGastos,
         efectivo_esperado: efectivoEsperado,
         efectivo_declarado: declarado,
+        yape_esperado: yapeEsperado,
+        yape_declarado: requiereYape ? yapeContado : 0,
         notas,
       })
       setMensaje('Cierre de caja guardado correctamente')
@@ -152,6 +170,7 @@ export function CierreCajaPage() {
             onChange={(e) => {
               setEfectivoInicialManual('')
               setEfectivoDeclarado('')
+              setYapeDeclarado('')
               setFechaCaja(e.target.value)
             }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500"
@@ -202,14 +221,35 @@ export function CierreCajaPage() {
             valor={efectivoEsperado}
             destacado
           />
+          {(ventasYape > 0 || devolucionesYape > 0) && (
+            <>
+              <div className="my-2 border-t border-teal-300" />
+              <FilaCalculo
+                icon={<Smartphone className="h-4 w-4 text-purple-600" />}
+                label="Ventas Yape hoy"
+                valor={ventasYape}
+                positivo
+              />
+              {devolucionesYape > 0 && (
+                <FilaCalculo
+                  icon={<Minus className="h-4 w-4 text-orange-500" />}
+                  label="Devoluciones Yape"
+                  valor={devolucionesYape}
+                  negativo
+                />
+              )}
+              <FilaCalculo
+                icon={<Smartphone className="h-4 w-4 text-purple-700" />}
+                label="Deberías tener en Yape"
+                valor={yapeEsperado}
+                destacado
+              />
+              <p className="text-xs text-purple-700">
+                El Yape va a tu celular — revísalo en la app al cerrar.
+              </p>
+            </>
+          )}
         </div>
-
-        {ventasYape > 0 && (
-          <p className="mt-3 flex items-center gap-2 text-xs text-teal-700">
-            <Smartphone className="h-4 w-4" />
-            Yape hoy: {formatMoney(ventasYape)} — va a tu celular, no a la caja física
-          </p>
-        )}
       </div>
 
       {/* Registrar gasto */}
@@ -312,28 +352,44 @@ export function CierreCajaPage() {
           </div>
 
           {declarado > 0 && (
-            <div
-              className={`rounded-lg p-4 ${
-                diferencia === 0
-                  ? 'bg-emerald-50 text-emerald-800'
-                  : diferencia < 0
-                    ? 'bg-red-50 text-red-800'
-                    : 'bg-amber-50 text-amber-800'
-              }`}
-            >
-              <p className="font-bold text-lg">
-                {diferencia === 0 && '¡Cuadra perfecto!'}
-                {diferencia < 0 && `Faltan ${formatMoney(Math.abs(diferencia))}`}
-                {diferencia > 0 && `Sobran ${formatMoney(diferencia)}`}
+            <CuadroDiferencia
+              tituloOk="¡Efectivo cuadra!"
+              diferencia={diferencia}
+              esperado={efectivoEsperado}
+              contado={declarado}
+              ayudaFaltante="Revisa: ¿olvidaste anotar algún gasto? ¿alguna venta fue Yape y no efectivo? ¿diste vuelto de más?"
+            />
+          )}
+
+          {(requiereYape || yapeDeclarado.trim() !== '') && (
+            <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-4">
+              <label className="mb-1 flex items-center gap-2 text-sm font-medium text-purple-900">
+                <Smartphone className="h-4 w-4" />
+                ¿Cuánto ves en tu app Yape hoy?
+              </label>
+              <p className="mb-2 text-xs text-purple-700">
+                Según ventas del sistema deberías tener {formatMoney(yapeEsperado)}
               </p>
-              <p className="mt-1 text-sm">
-                Esperabas {formatMoney(efectivoEsperado)} · Contaste {formatMoney(declarado)}
-              </p>
-              {diferencia < 0 && (
-                <p className="mt-2 text-xs">
-                  Revisa: ¿olvidaste anotar algún gasto? ¿alguna venta fue Yape y no efectivo?
-                  ¿diste vuelto de más?
-                </p>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={yapeDeclarado}
+                onChange={(e) => setYapeDeclarado(e.target.value)}
+                placeholder="Ej: 85.00"
+                className="w-full rounded-lg border border-purple-300 bg-white px-4 py-3 text-lg font-semibold outline-none focus:border-purple-500"
+              />
+              {yapeDeclarado.trim() !== '' && (
+                <div className="mt-3">
+                  <CuadroDiferencia
+                    tituloOk="¡Yape cuadra!"
+                    diferencia={diferenciaYape}
+                    esperado={yapeEsperado}
+                    contado={yapeContado}
+                    ayudaFaltante="Revisa: ¿algún pago Yape no se registró en ventas? ¿devolución pendiente?"
+                    compacto
+                  />
+                </div>
               )}
             </div>
           )}
@@ -348,7 +404,7 @@ export function CierreCajaPage() {
 
           <button
             onClick={handleCierre}
-            disabled={cerrando || declarado <= 0}
+            disabled={cerrando || !puedeCerrar}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 py-3.5 font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
           >
             {cerrando ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle className="h-5 w-5" />}
@@ -417,6 +473,42 @@ export function CierreCajaPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function CuadroDiferencia({
+  tituloOk,
+  diferencia,
+  esperado,
+  contado,
+  ayudaFaltante,
+  compacto,
+}: {
+  tituloOk: string
+  diferencia: number
+  esperado: number
+  contado: number
+  ayudaFaltante?: string
+  compacto?: boolean
+}) {
+  const ok = diferencia === 0
+  const falta = diferencia < 0
+  return (
+    <div
+      className={`rounded-lg p-4 ${
+        ok ? 'bg-emerald-50 text-emerald-800' : falta ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'
+      } ${compacto ? 'p-3' : ''}`}
+    >
+      <p className={`font-bold ${compacto ? 'text-base' : 'text-lg'}`}>
+        {ok && tituloOk}
+        {falta && `Faltan ${formatMoney(Math.abs(diferencia))}`}
+        {!ok && !falta && `Sobran ${formatMoney(diferencia)}`}
+      </p>
+      <p className="mt-1 text-sm">
+        Esperabas {formatMoney(esperado)} · Contaste {formatMoney(contado)}
+      </p>
+      {falta && ayudaFaltante && <p className="mt-2 text-xs">{ayudaFaltante}</p>}
     </div>
   )
 }

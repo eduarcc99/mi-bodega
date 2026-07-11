@@ -290,6 +290,7 @@ export async function fetchReporteCierres(desde: string, hasta: string): Promise
     .select(`
       fecha, efectivo_inicial, total_efectivo, total_yape, total_gastos,
       efectivo_esperado, efectivo_declarado, diferencia,
+      yape_esperado, yape_declarado, diferencia_yape,
       perfiles:cajero_id(nombre)
     `)
     .gte('fecha', desde)
@@ -308,6 +309,9 @@ export async function fetchReporteCierres(desde: string, hasta: string): Promise
     esperado: Number(c.efectivo_esperado ?? 0),
     declarado: Number(c.efectivo_declarado),
     diferencia: Number(c.diferencia),
+    yape_esperado: Number(c.yape_esperado ?? 0),
+    yape_contado: Number(c.yape_declarado ?? 0),
+    dif_yape: Number(c.diferencia_yape ?? 0),
   }))
 
   return {
@@ -319,9 +323,12 @@ export async function fetchReporteCierres(desde: string, hasta: string): Promise
       { key: 'ventas_efectivo', label: 'V. Efectivo (S/)' },
       { key: 'ventas_yape', label: 'V. Yape (S/)' },
       { key: 'gastos', label: 'Gastos (S/)' },
-      { key: 'esperado', label: 'Esperado (S/)' },
-      { key: 'declarado', label: 'Contado (S/)' },
-      { key: 'diferencia', label: 'Diferencia (S/)' },
+      { key: 'esperado', label: 'Efectivo esp. (S/)' },
+      { key: 'declarado', label: 'Efectivo cont. (S/)' },
+      { key: 'diferencia', label: 'Dif. efectivo (S/)' },
+      { key: 'yape_esperado', label: 'Yape esp. (S/)' },
+      { key: 'yape_contado', label: 'Yape cont. (S/)' },
+      { key: 'dif_yape', label: 'Dif. Yape (S/)' },
     ],
     filas,
     totales: { label: `${filas.length} cierres registrados` },

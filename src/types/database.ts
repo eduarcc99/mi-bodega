@@ -72,6 +72,9 @@ export interface CierreCaja {
   total_ventas: number
   efectivo_declarado: number
   diferencia: number
+  yape_esperado: number
+  yape_declarado: number
+  diferencia_yape: number
   notas: string | null
 }
 

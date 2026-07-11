@@ -39,6 +39,8 @@ export interface ResumenCajaDia {
   totalVentas: number
   totalGastos: number
   totalDevoluciones: number
+  devolucionesYape: number
+  yapeEsperado: number
   efectivoEsperado: number
   ventas: VentaResumen[]
   gastos: GastoCaja[]
@@ -51,6 +53,9 @@ export interface CierreExistente {
   efectivo_declarado: number
   diferencia: number
   efectivo_esperado: number
+  yape_declarado: number
+  yape_esperado: number
+  diferencia_yape: number
   fecha_hora: string
 }
 
@@ -83,7 +88,7 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
       .order('created_at', { ascending: true }),
     supabase
       .from('cierres_caja')
-      .select('id, efectivo_declarado, diferencia, efectivo_esperado, fecha_hora')
+      .select('id, efectivo_declarado, diferencia, efectivo_esperado, yape_declarado, yape_esperado, diferencia_yape, fecha_hora')
       .eq('fecha', fecha)
       .maybeSingle(),
     fetchUltimoCierre(),
@@ -109,10 +114,14 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
     .reduce((s, g) => s + Number(g.monto), 0)
 
   let devolucionesEfectivo = 0
+  let devolucionesYape = 0
   for (const d of devoluciones) {
     if (d.metodo_pago === 'efectivo') devolucionesEfectivo += Number(d.total)
+    else if (d.metodo_pago === 'yape') devolucionesYape += Number(d.total)
   }
   const totalDevoluciones = devoluciones.reduce((s, d) => s + Number(d.total), 0)
+
+  const yapeEsperado = Math.round((ventasYape - devolucionesYape) * 100) / 100
 
   // Efectivo inicial: del cierre anterior si es día distinto, o 0 si mismo día
   let efectivoInicial = 0
@@ -182,6 +191,8 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
     totalVentas: ventasEfectivo + ventasYape + ventasOtros,
     totalGastos,
     totalDevoluciones,
+    devolucionesYape,
+    yapeEsperado,
     efectivoEsperado: Math.round(efectivoEsperado * 100) / 100,
     ventas,
     gastos,
@@ -224,9 +235,12 @@ export async function cerrarCaja(params: {
   total_gastos: number
   efectivo_esperado: number
   efectivo_declarado: number
+  yape_esperado: number
+  yape_declarado: number
   notas?: string
 }): Promise<void> {
   const diferencia = Math.round((params.efectivo_declarado - params.efectivo_esperado) * 100) / 100
+  const diferencia_yape = Math.round((params.yape_declarado - params.yape_esperado) * 100) / 100
 
   const payload = {
     cajero_id: params.cajero_id,
@@ -240,6 +254,9 @@ export async function cerrarCaja(params: {
     efectivo_esperado: params.efectivo_esperado,
     efectivo_declarado: params.efectivo_declarado,
     diferencia,
+    yape_esperado: params.yape_esperado,
+    yape_declarado: params.yape_declarado,
+    diferencia_yape,
     notas: params.notas || null,
   }
 
