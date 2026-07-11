@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Store,
+  ClipboardList,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -18,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext'
 const adminLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/productos', label: 'Productos', icon: Package },
+  { to: '/pedidos-web', label: 'Pedidos web', icon: ClipboardList },
   { to: '/compras', label: 'Compras', icon: Truck },
   { to: '/devoluciones', label: 'Devoluciones', icon: RotateCcw },
   { to: '/reportes', label: 'Reportes', icon: FileText },
@@ -26,6 +28,7 @@ const adminLinks = [
 
 const cajeroLinks = [
   { to: '/pos', label: 'Punto de venta', icon: ShoppingCart },
+  { to: '/pedidos-web', label: 'Pedidos web', icon: ClipboardList },
   { to: '/devoluciones', label: 'Devoluciones', icon: RotateCcw },
   { to: '/cierre-caja', label: 'Cierre de caja', icon: Wallet },
 ]
