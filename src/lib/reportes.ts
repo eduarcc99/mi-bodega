@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { fetchDevolucionesEnRango, totalDevoluciones } from '@/lib/devoluciones'
-import { formatMoney, diasHastaVencimiento, productoVencido } from '@/lib/utils'
+import { formatMoney, diasHastaVencimiento, productoVencido, localDayRangeISO } from '@/lib/utils'
 
 export type TipoReporte = 'ventas' | 'compras' | 'inventario' | 'vencimientos' | 'cierres'
 
@@ -17,8 +17,8 @@ export interface ReporteData {
 
 function rangoISO(desde: string, hasta: string) {
   return {
-    desde: new Date(desde + 'T00:00:00').toISOString(),
-    hasta: new Date(hasta + 'T23:59:59.999').toISOString(),
+    desde: localDayRangeISO(desde).desde,
+    hasta: localDayRangeISO(hasta).hasta,
   }
 }
 

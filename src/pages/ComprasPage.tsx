@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { formatMoney, formatDate } from '@/lib/utils'
+import { formatMoney, formatDate, todayLocalISO } from '@/lib/utils'
 import {
   buscarProductosCompra,
   fetchCompras,
@@ -23,10 +23,6 @@ import {
   type CompraRegistrada,
 } from '@/lib/compras'
 import type { Producto } from '@/types/database'
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
 
 export function ComprasPage() {
   const { perfil } = useAuth()
@@ -40,7 +36,7 @@ export function ComprasPage() {
   const [mensaje, setMensaje] = useState('')
   const [expandida, setExpandida] = useState<string | null>(null)
 
-  const [fecha, setFecha] = useState(todayISO())
+  const [fecha, setFecha] = useState(todayLocalISO())
   const [proveedor, setProveedor] = useState('')
   const [ruc, setRuc] = useState('')
   const [telefono, setTelefono] = useState('')
@@ -115,7 +111,7 @@ export function ComprasPage() {
   }
 
   function resetForm() {
-    setFecha(todayISO())
+    setFecha(todayLocalISO())
     setProveedor('')
     setRuc('')
     setTelefono('')

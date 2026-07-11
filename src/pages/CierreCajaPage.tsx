@@ -14,7 +14,7 @@ import {
   Calculator,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, todayLocalISO } from '@/lib/utils'
 import {
   CATEGORIAS_GASTO,
   fetchResumenCaja,
@@ -28,6 +28,7 @@ export function CierreCajaPage() {
   const { perfil } = useAuth()
   const [resumen, setResumen] = useState<ResumenCajaDia | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fechaCaja, setFechaCaja] = useState(todayLocalISO())
   const [efectivoInicialManual, setEfectivoInicialManual] = useState<string>('')
   const [efectivoDeclarado, setEfectivoDeclarado] = useState('')
   const [notas, setNotas] = useState('')
@@ -40,10 +41,10 @@ export function CierreCajaPage() {
   const [gastoMonto, setGastoMonto] = useState('')
   const [gastoCat, setGastoCat] = useState('compra_mercaderia')
 
-  async function load() {
+  async function load(fecha = fechaCaja) {
     setLoading(true)
     try {
-      const data = await fetchResumenCaja()
+      const data = await fetchResumenCaja(fecha)
       setResumen(data)
       if (!efectivoInicialManual && data.efectivoInicial > 0) {
         setEfectivoInicialManual(String(data.efectivoInicial))
@@ -56,8 +57,8 @@ export function CierreCajaPage() {
   }
 
   useEffect(() => {
-    load()
-  }, [])
+    load(fechaCaja)
+  }, [fechaCaja])
 
   const efectivoInicial = parseFloat(efectivoInicialManual) || resumen?.efectivoInicial || 0
   const ventasEfectivo = resumen?.ventasEfectivo ?? 0
@@ -135,11 +136,27 @@ export function CierreCajaPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Mi caja del día</h1>
-        <p className="text-slate-500">
-          Aquí ves en simple dónde entró y salió tu plata — como cuando cuentas el efectivo a mano.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Mi caja del día</h1>
+          <p className="text-slate-500">
+            Aquí ves en simple dónde entró y salió tu plata — como cuando cuentas el efectivo a mano.
+          </p>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-500">Fecha</label>
+          <input
+            type="date"
+            value={fechaCaja}
+            max={todayLocalISO()}
+            onChange={(e) => {
+              setEfectivoInicialManual('')
+              setEfectivoDeclarado('')
+              setFechaCaja(e.target.value)
+            }}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500"
+          />
+        </div>
       </div>
 
       {/* Explicación tipo dueña */}

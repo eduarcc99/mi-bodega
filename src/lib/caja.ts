@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { fetchDevolucionesDelDia } from '@/lib/devoluciones'
+import { localDayRangeISO, todayLocalISO } from '@/lib/utils'
 import type { MetodoPago } from '@/types/database'
 
 export interface VentaResumen {
@@ -53,16 +54,6 @@ export interface CierreExistente {
   fecha_hora: string
 }
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function dayRange(fecha: string) {
-  const desde = new Date(fecha + 'T00:00:00')
-  const hasta = new Date(fecha + 'T23:59:59.999')
-  return { desde: desde.toISOString(), hasta: hasta.toISOString() }
-}
-
 export async function fetchUltimoCierre(): Promise<{ fecha: string; efectivo_declarado: number } | null> {
   const { data } = await supabase
     .from('cierres_caja')
@@ -74,8 +65,8 @@ export async function fetchUltimoCierre(): Promise<{ fecha: string; efectivo_dec
   return data
 }
 
-export async function fetchResumenCaja(fecha = todayISO()): Promise<ResumenCajaDia> {
-  const { desde, hasta } = dayRange(fecha)
+export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<ResumenCajaDia> {
+  const { desde, hasta } = localDayRangeISO(fecha)
 
   const [ventasRes, gastosRes, cierreRes, ultimoCierre, devoluciones] = await Promise.all([
     supabase
@@ -212,7 +203,7 @@ export async function registrarGasto(params: {
     monto: params.monto,
     categoria: params.categoria,
     registrado_por: params.registrado_por,
-    fecha: params.fecha ?? todayISO(),
+    fecha: params.fecha ?? todayLocalISO(),
     afecta_efectivo: params.afecta_efectivo ?? true,
   })
   if (error) throw new Error(error.message)

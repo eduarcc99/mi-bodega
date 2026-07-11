@@ -2,13 +2,14 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ExcelJS from 'exceljs'
 import type { ReporteData } from '@/lib/reportes'
+import { todayLocalISO } from '@/lib/utils'
 
 function nombreArchivo(titulo: string, ext: string): string {
   const slug = titulo
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '')
-  const fecha = new Date().toISOString().slice(0, 10)
+  const fecha = todayLocalISO()
   return `bodega_${slug}_${fecha}.${ext}`
 }
 

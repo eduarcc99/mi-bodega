@@ -19,7 +19,7 @@ import {
   type ReporteData,
 } from '@/lib/reportes'
 import { exportarPDF, exportarExcel } from '@/lib/export'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, todayLocalISO } from '@/lib/utils'
 
 const iconos: Record<TipoReporte, typeof FileText> = {
   ventas: ShoppingCart,
@@ -32,11 +32,11 @@ const iconos: Record<TipoReporte, typeof FileText> = {
 function defaultDesde(): string {
   const d = new Date()
   d.setDate(d.getDate() - 30)
-  return d.toISOString().slice(0, 10)
+  return todayLocalISO(d)
 }
 
 function defaultHasta(): string {
-  return new Date().toISOString().slice(0, 10)
+  return todayLocalISO()
 }
 
 export function ReportesPage() {

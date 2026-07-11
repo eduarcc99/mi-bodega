@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { localDayRangeISO } from '@/lib/utils'
 import type { MetodoPago } from '@/types/database'
 
 export interface VentaDetalleDevolucion {
@@ -197,8 +198,7 @@ export async function registrarDevolucion(params: {
 export async function fetchDevolucionesDelDia(fecha: string): Promise<
   { id: string; total: number; metodo_pago: MetodoPago; venta_id: string }[]
 > {
-  const desde = `${fecha}T00:00:00`
-  const hasta = `${fecha}T23:59:59.999`
+  const { desde, hasta } = localDayRangeISO(fecha)
 
   const { data } = await supabase
     .from('devoluciones')

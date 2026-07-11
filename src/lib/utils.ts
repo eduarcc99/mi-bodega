@@ -43,3 +43,18 @@ export function productoPorVencer(fecha: string | null, diasAlerta = 15): boolea
 export function stockBajo(stock: number, minimo: number): boolean {
   return stock <= minimo
 }
+
+/** Fecha local YYYY-MM-DD (no UTC — evita que caja quede vacía después de las 7 PM en Perú) */
+export function todayLocalISO(d = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Inicio y fin del día calendario local en ISO para consultas Supabase */
+export function localDayRangeISO(fecha: string): { desde: string; hasta: string } {
+  const desde = new Date(`${fecha}T00:00:00`)
+  const hasta = new Date(`${fecha}T23:59:59.999`)
+  return { desde: desde.toISOString(), hasta: hasta.toISOString() }
+}
