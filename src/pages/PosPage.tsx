@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react'
 import {
   ShoppingCart,
   ScanBarcode,
+  Camera,
   Trash2,
   Plus,
   Minus,
@@ -35,6 +36,10 @@ import { formatMoney } from '@/lib/utils'
 import type { MetodoPago, Producto } from '@/types/database'
 import { VentaTicket } from '@/components/pos/VentaTicket'
 
+const CameraScannerModal = lazy(() =>
+  import('@/components/pos/CameraScannerModal').then((m) => ({ default: m.CameraScannerModal })),
+)
+
 interface ModalAgregar {
   producto: Producto
   modo: ModoVenta
@@ -60,6 +65,7 @@ export function PosPage() {
   const [genericPrecio, setGenericPrecio] = useState('')
 
   const [modalAgregar, setModalAgregar] = useState<ModalAgregar | null>(null)
+  const [showCameraScanner, setShowCameraScanner] = useState(false)
 
   const [backdate, setBackdate] = useState('')
   const puedeBackdate = isAdmin || perfil?.puede_backdate
@@ -186,6 +192,13 @@ export function PosPage() {
     setAvisoBusqueda(
       `No encontramos productos con "${q}". Revisa el nombre o usa el botón Venta genérica si no está en el catálogo.`,
     )
+  }
+
+  function handleCameraScan(code: string) {
+    setShowCameraScanner(false)
+    setBusqueda(code)
+    void handleSearch(code)
+    focusSearch()
   }
 
   function addProductoDirecto(producto: Producto) {
@@ -333,26 +346,36 @@ export function PosPage() {
         )}
       </div>
 
-      <div className="relative">
-        <ScanBarcode className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-teal-600" />
-        <input
-          ref={inputRef}
-          type="search"
-          value={busqueda}
-          onChange={(e) => {
-            setBusqueda(e.target.value)
-            setResultados([])
-            setAvisoBusqueda('')
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              handleSearch()
-            }
-          }}
-          placeholder="Código de barras o nombre del producto…"
-          className="w-full rounded-xl border-2 border-teal-200 bg-white py-4 pl-14 pr-4 text-lg outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
-        />
+      <div className="relative flex gap-2">
+        <div className="relative flex-1">
+          <ScanBarcode className="absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-teal-600" />
+          <input
+            ref={inputRef}
+            type="search"
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value)
+              setResultados([])
+              setAvisoBusqueda('')
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                handleSearch()
+              }
+            }}
+            placeholder="Código de barras o nombre del producto…"
+            className="w-full rounded-xl border-2 border-teal-200 bg-white py-4 pl-14 pr-4 text-lg outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCameraScanner(true)}
+          className="flex shrink-0 items-center justify-center rounded-xl border-2 border-teal-200 bg-white px-4 text-teal-700 hover:bg-teal-50"
+          title="Escanear con cámara (QR o barras)"
+        >
+          <Camera className="h-6 w-6" />
+        </button>
       </div>
 
       {avisoBusqueda && (
@@ -687,6 +710,21 @@ export function PosPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showCameraScanner && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+              <Loader2 className="h-10 w-10 animate-spin text-white" />
+            </div>
+          }
+        >
+          <CameraScannerModal
+            onScan={handleCameraScan}
+            onClose={() => setShowCameraScanner(false)}
+          />
+        </Suspense>
       )}
 
       {ventaCompletada && perfil && (
