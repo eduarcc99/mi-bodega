@@ -13,6 +13,9 @@ import {
   buscarVentas,
   fetchVentaParaDevolucion,
   calcMontoDevolucion,
+  cantidadStockDevolucion,
+  maxCantidadDevolucion,
+  etiquetaCantidadDevolucion,
   registrarDevolucion,
   type VentaParaDevolucion,
 } from '@/lib/devoluciones'
@@ -63,7 +66,7 @@ export function DevolucionesPage() {
         setVenta(null)
         return
       }
-      if (v.detalles.every((d) => d.cantidad_disponible <= 0)) {
+      if (v.detalles.every((d) => maxCantidadDevolucion(d) <= 0)) {
         setError('Esta venta ya fue devuelta completamente')
         setVenta(null)
         return
@@ -88,7 +91,8 @@ export function DevolucionesPage() {
     if (!venta) return
     const all: Record<string, number> = {}
     for (const d of venta.detalles) {
-      if (d.cantidad_disponible > 0) all[d.id] = d.cantidad_disponible
+      const max = maxCantidadDevolucion(d)
+      if (max > 0) all[d.id] = max
     }
     setCantidades(all)
   }
@@ -103,7 +107,7 @@ export function DevolucionesPage() {
             venta_detalle_id: d.id,
             producto_id: d.producto_id,
             nombre: d.nombre_producto,
-            cantidad: cant,
+            cantidad: cantidadStockDevolucion(d, cant),
             monto,
           }
         })
@@ -243,11 +247,14 @@ export function DevolucionesPage() {
           </button>
 
           <div className="space-y-3">
-            {venta.detalles.map((d) => (
+            {venta.detalles.map((d) => {
+              const max = maxCantidadDevolucion(d)
+              const porUnidad = d.modo_venta === 'unidad_suelta'
+              return (
               <div
                 key={d.id}
                 className={`rounded-lg border p-3 ${
-                  d.cantidad_disponible <= 0 ? 'border-slate-100 bg-slate-50 opacity-50' : 'border-slate-200'
+                  max <= 0 ? 'border-slate-100 bg-slate-50 opacity-50' : 'border-slate-200'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -256,24 +263,27 @@ export function DevolucionesPage() {
                     <div>
                       <p className="font-medium text-slate-900">{d.nombre_producto}</p>
                       <p className="text-xs text-slate-500">
-                        Vendidos: {d.cantidad} · Ya devueltos: {d.cantidad_devuelta} ·
-                        Disponibles: {d.cantidad_disponible}
+                        Vendidos: {etiquetaCantidadDevolucion(d)}
+                        {porUnidad
+                          ? ` · Devueltos: ${d.unidades_devueltas} ud · Disponibles: ${d.unidades_disponibles} ud`
+                          : ` · Ya devueltos: ${d.cantidad_devuelta} · Disponibles: ${d.cantidad_disponible}`}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Precio: {formatMoney(d.precio_unitario)} c/u
+                        Precio: {formatMoney(d.precio_unitario)}
+                        {porUnidad ? '/ud' : ' c/u'}
                       </p>
                     </div>
                   </div>
-                  {d.cantidad_disponible > 0 && (
+                  {max > 0 && (
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         min="0"
-                        max={d.cantidad_disponible}
-                        step="0.001"
+                        max={max}
+                        step={porUnidad ? '1' : '0.001'}
                         value={cantidades[d.id] ?? 0}
                         onChange={(e) =>
-                          setCantidad(d.id, parseFloat(e.target.value) || 0, d.cantidad_disponible)
+                          setCantidad(d.id, parseFloat(e.target.value) || 0, max)
                         }
                         className="w-16 rounded border border-slate-300 px-2 py-1 text-center text-sm"
                       />
@@ -286,7 +296,7 @@ export function DevolucionesPage() {
                   )}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
 
           <div className="mt-4">

@@ -1,6 +1,6 @@
 import { Printer, X, CheckCircle } from 'lucide-react'
 import type { VentaCompletada } from '@/lib/pos'
-import { cartItemSubtotal, cartTotal } from '@/lib/pos'
+import { cartItemSubtotal, cartTotal, etiquetaCantidadItem } from '@/lib/pos'
 import { formatMoney } from '@/lib/utils'
 
 interface VentaTicketProps {
@@ -52,7 +52,7 @@ export function VentaTicket({ venta, cajeroNombre, onClose }: VentaTicketProps) 
                 <div className="flex-1">
                   <p className="font-medium">{item.nombre}</p>
                   <p className="text-xs text-slate-500">
-                    {item.cantidad} {item.unidad} × {formatMoney(item.precio_unitario)}
+                    {etiquetaCantidadItem(item)} × {formatMoney(item.precio_unitario)}
                     {item.descuento > 0 && ` (−${formatMoney(item.descuento)})`}
                   </p>
                 </div>

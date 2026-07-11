@@ -1,16 +1,21 @@
 import { supabase } from '@/lib/supabase'
 import { localDayRangeISO } from '@/lib/utils'
 import type { MetodoPago } from '@/types/database'
+import type { ModoVenta } from '@/lib/pos'
 
 export interface VentaDetalleDevolucion {
   id: string
   producto_id: string | null
   nombre_producto: string
   cantidad: number
+  unidades_cobradas: number
+  modo_venta: ModoVenta
   precio_unitario: number
   descuento: number
   cantidad_devuelta: number
   cantidad_disponible: number
+  unidades_devueltas: number
+  unidades_disponibles: number
 }
 
 export interface VentaParaDevolucion {
@@ -30,6 +35,32 @@ export interface LineaDevolucion {
   nombre: string
   cantidad: number
   monto: number
+}
+
+function esDevolucionPorUnidad(detalle: VentaDetalleDevolucion): boolean {
+  return detalle.modo_venta === 'unidad_suelta'
+}
+
+function stockPorUnidadCobrada(detalle: VentaDetalleDevolucion): number {
+  if (detalle.unidades_cobradas <= 0) return detalle.cantidad
+  return detalle.cantidad / detalle.unidades_cobradas
+}
+
+export function etiquetaCantidadDevolucion(detalle: VentaDetalleDevolucion): string {
+  if (esDevolucionPorUnidad(detalle)) {
+    return `${detalle.unidades_cobradas} ud`
+  }
+  if (detalle.modo_venta === 'peso') {
+    return `${detalle.cantidad} kg`
+  }
+  return `${detalle.cantidad}`
+}
+
+export function stockDesdeUnidadesDevueltas(
+  detalle: VentaDetalleDevolucion,
+  unidadesDevolver: number,
+): number {
+  return Math.round(unidadesDevolver * stockPorUnidadCobrada(detalle) * 1000) / 1000
 }
 
 function montoLineaDevolucion(
@@ -91,7 +122,7 @@ export async function fetchVentaParaDevolucion(ventaId: string): Promise<VentaPa
     .select(`
       id, fecha, total, metodo_pago, estado, cajero_id,
       perfiles:cajero_id(nombre),
-      venta_detalles(id, producto_id, nombre_producto, cantidad, precio_unitario, descuento)
+      venta_detalles(id, producto_id, nombre_producto, cantidad, unidades_cobradas, modo_venta, precio_unitario, descuento)
     `)
     .eq('id', ventaId)
     .single()
@@ -122,20 +153,37 @@ export async function fetchVentaParaDevolucion(ventaId: string): Promise<VentaPa
       producto_id: string | null
       nombre_producto: string
       cantidad: number
+      unidades_cobradas: number
+      modo_venta: ModoVenta
       precio_unitario: number
       descuento: number
     }) => {
       const cantidad = Number(d.cantidad)
-      const devuelta = devueltoPorLinea.get(d.id) ?? 0
+      const unidadesCobradas = Number(d.unidades_cobradas ?? d.cantidad)
+      const modo = (d.modo_venta ?? 'normal') as ModoVenta
+      const stockDevuelto = devueltoPorLinea.get(d.id) ?? 0
+      const ratio = unidadesCobradas > 0 ? cantidad / unidadesCobradas : 1
+      const unidadesDevueltas =
+        modo === 'unidad_suelta'
+          ? Math.round((stockDevuelto / ratio) * 1000) / 1000
+          : stockDevuelto
+      const unidadesDisponibles =
+        modo === 'unidad_suelta'
+          ? Math.max(0, unidadesCobradas - unidadesDevueltas)
+          : Math.max(0, cantidad - stockDevuelto)
       return {
         id: d.id,
         producto_id: d.producto_id,
         nombre_producto: d.nombre_producto,
         cantidad,
+        unidades_cobradas: unidadesCobradas,
+        modo_venta: modo,
         precio_unitario: Number(d.precio_unitario),
         descuento: Number(d.descuento),
-        cantidad_devuelta: devuelta,
-        cantidad_disponible: Math.max(0, cantidad - devuelta),
+        cantidad_devuelta: stockDevuelto,
+        cantidad_disponible: Math.max(0, cantidad - stockDevuelto),
+        unidades_devueltas: unidadesDevueltas,
+        unidades_disponibles: unidadesDisponibles,
       }
     },
   )
@@ -156,12 +204,31 @@ export function calcMontoDevolucion(
   detalle: VentaDetalleDevolucion,
   cantidadDevolver: number,
 ): number {
+  const cantidadOriginal = esDevolucionPorUnidad(detalle)
+    ? detalle.unidades_cobradas
+    : detalle.cantidad
   return montoLineaDevolucion(
     cantidadDevolver,
-    detalle.cantidad,
+    cantidadOriginal,
     detalle.precio_unitario,
     detalle.descuento,
   )
+}
+
+export function cantidadStockDevolucion(
+  detalle: VentaDetalleDevolucion,
+  cantidadIngresada: number,
+): number {
+  if (esDevolucionPorUnidad(detalle)) {
+    return stockDesdeUnidadesDevueltas(detalle, cantidadIngresada)
+  }
+  return cantidadIngresada
+}
+
+export function maxCantidadDevolucion(detalle: VentaDetalleDevolucion): number {
+  return esDevolucionPorUnidad(detalle)
+    ? detalle.unidades_disponibles
+    : detalle.cantidad_disponible
 }
 
 export async function registrarDevolucion(params: {

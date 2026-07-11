@@ -35,6 +35,9 @@ export interface Producto {
   imagen_url: string | null
   cantidad_mayor: number | null
   precio_mayor: number | null
+  permite_venta_unidad: boolean
+  precio_por_unidad: number | null
+  peso_estimado_unidad: number | null
   created_at: string
   updated_at: string
   categorias?: Categoria
@@ -93,4 +96,7 @@ export interface ProductoForm {
   imagen_url: string
   cantidad_mayor: string
   precio_mayor: string
+  permite_venta_unidad: boolean
+  precio_por_unidad: string
+  peso_estimado_unidad: string
 }

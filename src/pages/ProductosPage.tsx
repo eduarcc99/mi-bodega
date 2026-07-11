@@ -45,6 +45,9 @@ const emptyForm: ProductoForm = {
   imagen_url: '',
   cantidad_mayor: '',
   precio_mayor: '',
+  permite_venta_unidad: false,
+  precio_por_unidad: '',
+  peso_estimado_unidad: '',
 }
 
 function parseNum(value: string, fallback = 0): number {
@@ -181,6 +184,9 @@ export function ProductosPage() {
       imagen_url: p.imagen_url ?? '',
       cantidad_mayor: p.cantidad_mayor?.toString() ?? '',
       precio_mayor: p.precio_mayor?.toString() ?? '',
+      permite_venta_unidad: p.permite_venta_unidad ?? false,
+      precio_por_unidad: p.precio_por_unidad != null ? String(p.precio_por_unidad) : '',
+      peso_estimado_unidad: p.peso_estimado_unidad != null ? String(p.peso_estimado_unidad) : '',
     })
     setError('')
     setModalOpen(true)
@@ -253,6 +259,15 @@ export function ProductosPage() {
       imagen_url: form.imagen_url || null,
       cantidad_mayor: form.cantidad_mayor ? Number(form.cantidad_mayor) : null,
       precio_mayor: form.precio_mayor ? Number(form.precio_mayor) : null,
+      permite_venta_unidad: form.unidad === 'kg' ? form.permite_venta_unidad : false,
+      precio_por_unidad:
+        form.unidad === 'kg' && form.permite_venta_unidad && form.precio_por_unidad
+          ? parseNum(form.precio_por_unidad)
+          : null,
+      peso_estimado_unidad:
+        form.unidad === 'kg' && form.permite_venta_unidad && form.peso_estimado_unidad
+          ? parseNum(form.peso_estimado_unidad)
+          : null,
       updated_at: new Date().toISOString(),
     }
 
@@ -479,7 +494,9 @@ export function ProductosPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Costo (S/)</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    {form.unidad === 'kg' || form.unidad === 'litro' ? 'Costo por kg/L (S/)' : 'Costo (S/)'}
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -504,7 +521,9 @@ export function ProductosPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Precio venta</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    {form.unidad === 'kg' || form.unidad === 'litro' ? 'Precio por kg/L' : 'Precio venta'}
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -516,6 +535,56 @@ export function ProductosPage() {
                   />
                 </div>
               </div>
+
+              {form.unidad === 'kg' && (
+                <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-4 space-y-3">
+                  <p className="text-sm font-medium text-teal-900">Venta mixta (ej. tomate)</p>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={form.permite_venta_unidad}
+                      onChange={(e) => updateForm('permite_venta_unidad', e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    También se vende por unidad suelta (precio fijo por pieza)
+                  </label>
+                  {form.permite_venta_unidad && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                          Precio por unidad (S/)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.precio_por_unidad}
+                          onChange={(e) => updateForm('precio_por_unidad', e.target.value)}
+                          placeholder="Ej: 1.00"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                          Peso estimado por unidad (kg)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          value={form.peso_estimado_unidad}
+                          onChange={(e) => updateForm('peso_estimado_unidad', e.target.value)}
+                          placeholder="Ej: 0.125"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-teal-700">
+                    En POS: por peso (balanza) o por unidad. El stock siempre se descuenta en kg.
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

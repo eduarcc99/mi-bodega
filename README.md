@@ -72,6 +72,20 @@ El Yape va al celular, no al cajón físico.
 - Sin coincidencias → aviso; **no** abre venta genérica sola  
 - **Venta genérica** → solo con el botón explícito del carrito  
 - Último producto agregado aparece **arriba** en el carrito  
+- Productos **kg/litro** → modal para ingresar cantidad (no se agrega 1 solo)  
+- **Venta mixta** (ej. tomate): por peso (balanza) o por unidad suelta con precio fijo  
+
+### Venta mixta (kg + unidad suelta)
+Para productos vendidos por peso que también se venden sueltos (tomate, etc.):
+
+| Campo en producto | Significado |
+|-------------------|-------------|
+| Costo / precio catálogo | Por **kg** |
+| Precio por unidad | Cobro por pieza suelta (S/) |
+| Peso estimado por unidad | Cuántos kg descuenta del stock por cada pieza |
+
+En POS el cajero elige **por peso** o **por unidad**. El stock siempre se descuenta en kg.  
+En devoluciones, las ventas por unidad se devuelven en **piezas**.
 
 ### Categorías
 Desde **Productos → Categorías**: crear, editar margen % o eliminar (ej. Licores, Fiambres).
@@ -110,6 +124,10 @@ Ejecutar en **Supabase → SQL Editor**:
 | 4 | `supabase/caja-gastos.sql` | Gastos de caja + columnas cierre |
 | 5 | `supabase/devoluciones-trigger.sql` | Devoluciones + repone stock |
 | 6 | `supabase/caja-yape.sql` | Conciliación Yape en cierre |
+| 7 | `supabase/venta-mixta.sql` | Venta por peso + unidad suelta (tomate) |
+
+**Opcional** (solo para vaciar datos de prueba, no borra usuarios ni categorías):  
+`supabase/cleanup-prueba.sql`
 
 ### 3. Supabase — Auth y usuario dueña
 
@@ -172,7 +190,9 @@ supabase/
 ├── ventas-stock-trigger.sql
 ├── caja-gastos.sql
 ├── devoluciones-trigger.sql
-└── caja-yape.sql
+├── caja-yape.sql
+├── venta-mixta.sql
+└── cleanup-prueba.sql
 ```
 
 ---
@@ -205,6 +225,7 @@ POCO A POCO:
 | CRUD productos + Cloudinary | ✅ |
 | Categorías desde la app | ✅ |
 | POS (carrito, pagos, genérica, ticket) | ✅ |
+| Venta mixta kg + unidad suelta | ✅ |
 | Devoluciones + stock + caja | ✅ |
 | Ventas netas en dashboard y reportes | ✅ |
 | Cierre caja (efectivo, Yape, gastos) | ✅ |

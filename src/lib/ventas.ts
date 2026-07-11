@@ -1,13 +1,13 @@
 import { supabase } from '@/lib/supabase'
 import type { CartItem } from '@/lib/pos'
-import { cartTotal } from '@/lib/pos'
+import { cantidadStockItem, cartTotal } from '@/lib/pos'
 import type { MetodoPago, Producto } from '@/types/database'
 import { productoVencido } from '@/lib/utils'
 
-export function validateProductoParaVenta(producto: Producto): string | null {
+export function validateProductoParaVenta(producto: Producto, stockNecesario = 0.001): string | null {
   if (!producto.activo) return `"${producto.nombre}" está inactivo`
   if (productoVencido(producto.fecha_vencimiento)) return `"${producto.nombre}" está vencido`
-  if (producto.stock <= 0) return `"${producto.nombre}" sin stock`
+  if (producto.stock < stockNecesario) return `"${producto.nombre}" sin stock`
   return null
 }
 
@@ -71,7 +71,9 @@ export async function completarVenta(params: {
     venta_id: venta.id,
     producto_id: item.producto_id,
     nombre_producto: item.nombre,
-    cantidad: item.cantidad,
+    cantidad: cantidadStockItem(item),
+    unidades_cobradas: item.cantidad,
+    modo_venta: item.modo_venta,
     precio_original: item.precio_original,
     precio_unitario: item.precio_unitario,
     descuento: item.descuento,

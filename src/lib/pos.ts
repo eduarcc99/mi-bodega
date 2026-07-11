@@ -1,5 +1,7 @@
 import type { MetodoPago, Producto, UnidadMedida } from '@/types/database'
 
+export type ModoVenta = 'normal' | 'peso' | 'unidad_suelta'
+
 export interface CartItem {
   key: string
   producto_id: string | null
@@ -14,6 +16,8 @@ export interface CartItem {
   es_generica: boolean
   cantidad_mayor: number | null
   precio_mayor: number | null
+  modo_venta: ModoVenta
+  peso_estimado_unidad: number | null
 }
 
 export interface VentaCompletada {
@@ -22,6 +26,38 @@ export interface VentaCompletada {
   metodo_pago: MetodoPago
   fecha: string
   items: CartItem[]
+}
+
+export function esVentaPorPeso(producto: Producto): boolean {
+  return producto.unidad === 'kg' || producto.unidad === 'litro'
+}
+
+export function permiteVentaUnidadSuelta(producto: Producto): boolean {
+  return (
+    producto.unidad === 'kg' &&
+    producto.permite_venta_unidad === true &&
+    producto.precio_por_unidad != null &&
+    producto.precio_por_unidad > 0 &&
+    producto.peso_estimado_unidad != null &&
+    producto.peso_estimado_unidad > 0
+  )
+}
+
+export function cantidadStockItem(item: CartItem): number {
+  if (item.modo_venta === 'unidad_suelta' && item.peso_estimado_unidad) {
+    return Math.round(item.cantidad * item.peso_estimado_unidad * 1000) / 1000
+  }
+  return item.cantidad
+}
+
+export function etiquetaCantidadItem(item: CartItem): string {
+  if (item.modo_venta === 'unidad_suelta') {
+    return `${item.cantidad} ud`
+  }
+  if (item.modo_venta === 'peso') {
+    return `${item.cantidad} ${item.unidad}`
+  }
+  return `${item.cantidad} ${item.unidad}`
 }
 
 export function getPrecioUnitario(producto: Producto, cantidad: number): number {
@@ -43,14 +79,25 @@ export function cartTotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + cartItemSubtotal(item), 0)
 }
 
-export function productoFromCart(producto: Producto, cantidad = 1): CartItem {
-  const precio = getPrecioUnitario(producto, cantidad)
+export function productoFromCart(
+  producto: Producto,
+  cantidad: number,
+  modo: ModoVenta = 'normal',
+): CartItem {
+  const esPeso = esVentaPorPeso(producto)
+  const modoFinal = modo === 'normal' && esPeso ? 'peso' : modo
+
+  let precio = getPrecioUnitario(producto, cantidad)
+  if (modoFinal === 'unidad_suelta' && producto.precio_por_unidad) {
+    precio = producto.precio_por_unidad
+  }
+
   return {
-    key: producto.id,
+    key: `${producto.id}-${modoFinal}-${Date.now()}`,
     producto_id: producto.id,
     nombre: producto.nombre,
     cantidad,
-    precio_original: producto.precio_venta,
+    precio_original: modoFinal === 'unidad_suelta' ? producto.precio_por_unidad! : producto.precio_venta,
     precio_unitario: precio,
     descuento: 0,
     costo_unitario: producto.costo,
@@ -59,6 +106,8 @@ export function productoFromCart(producto: Producto, cantidad = 1): CartItem {
     es_generica: false,
     cantidad_mayor: producto.cantidad_mayor,
     precio_mayor: producto.precio_mayor,
+    modo_venta: modoFinal,
+    peso_estimado_unidad: producto.peso_estimado_unidad ?? null,
   }
 }
 
@@ -77,12 +126,19 @@ export function genericCartItem(nombre: string, precio: number, cantidad = 1): C
     es_generica: true,
     cantidad_mayor: null,
     precio_mayor: null,
+    modo_venta: 'normal',
+    peso_estimado_unidad: null,
   }
 }
 
 export function updateCartItemQuantity(item: CartItem, cantidad: number): CartItem {
   const next = { ...item, cantidad }
-  if (!item.es_generica && item.cantidad_mayor != null && item.precio_mayor != null) {
+  if (
+    item.modo_venta === 'normal' &&
+    !item.es_generica &&
+    item.cantidad_mayor != null &&
+    item.precio_mayor != null
+  ) {
     const precioMayor = cantidad >= item.cantidad_mayor
     next.precio_unitario = precioMayor ? item.precio_mayor : item.precio_original
   }
@@ -91,7 +147,9 @@ export function updateCartItemQuantity(item: CartItem, cantidad: number): CartIt
 
 export function mergeCartItems(items: CartItem[], newItem: CartItem): CartItem[] {
   if (!newItem.es_generica && newItem.producto_id) {
-    const idx = items.findIndex((i) => i.producto_id === newItem.producto_id)
+    const idx = items.findIndex(
+      (i) => i.producto_id === newItem.producto_id && i.modo_venta === newItem.modo_venta,
+    )
     if (idx >= 0) {
       const merged = updateCartItemQuantity(
         items[idx],
@@ -101,4 +159,12 @@ export function mergeCartItems(items: CartItem[], newItem: CartItem): CartItem[]
     }
   }
   return [newItem, ...items]
+}
+
+export function stockNecesario(item: CartItem, cantidadExtra = 0): number {
+  const totalCant = item.cantidad + cantidadExtra
+  if (item.modo_venta === 'unidad_suelta' && item.peso_estimado_unidad) {
+    return Math.round(totalCant * item.peso_estimado_unidad * 1000) / 1000
+  }
+  return totalCant
 }
