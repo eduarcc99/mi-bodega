@@ -108,6 +108,7 @@ export function ProductosPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activos' | 'inactivos'>('activos')
   const [pagina, setPagina] = useState(1)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -131,7 +132,7 @@ export function ProductosPage() {
 
   useEffect(() => {
     setPagina(1)
-  }, [busqueda, filtroCategoria])
+  }, [busqueda, filtroCategoria, filtroEstado])
 
   async function loadData() {
     setLoading(true)
@@ -346,9 +347,13 @@ export function ProductosPage() {
           p.nombre.toLowerCase().includes(q) ||
           (p.codigo_barra?.toLowerCase().includes(q) ?? false)
         const matchCategoria = !filtroCategoria || p.categoria_id === filtroCategoria
-        return matchBusqueda && matchCategoria
+        const matchEstado =
+          filtroEstado === 'todos' ||
+          (filtroEstado === 'activos' && p.activo) ||
+          (filtroEstado === 'inactivos' && !p.activo)
+        return matchBusqueda && matchCategoria && matchEstado
       }),
-    [productos, busqueda, filtroCategoria],
+    [productos, busqueda, filtroCategoria, filtroEstado],
   )
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
@@ -366,7 +371,7 @@ export function ProductosPage() {
     const bajo = stockBajo(p.stock, p.stock_minimo)
 
     return (
-      <tr key={p.id} className="hover:bg-slate-50">
+      <tr key={p.id} className={`hover:bg-slate-50 ${!p.activo ? 'opacity-60' : ''}`}>
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
             <ProductoThumbnail producto={p} />
@@ -430,7 +435,9 @@ export function ProductosPage() {
     return (
       <div
         key={p.id}
-        className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+        className={`flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm ${
+          !p.activo ? 'opacity-60' : ''
+        }`}
       >
         <ProductoThumbnail producto={p} />
         <div className="min-w-0 flex-1">
@@ -513,6 +520,15 @@ export function ProductosPage() {
               {c.nombre}
             </option>
           ))}
+        </select>
+        <select
+          value={filtroEstado}
+          onChange={(e) => setFiltroEstado(e.target.value as 'todos' | 'activos' | 'inactivos')}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none focus:border-teal-500 sm:w-40"
+        >
+          <option value="activos">Solo activos</option>
+          <option value="inactivos">Solo inactivos</option>
+          <option value="todos">Todos</option>
         </select>
       </div>
 
@@ -812,6 +828,40 @@ export function ProductosPage() {
                     <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
                   </label>
                 </div>
+              </div>
+
+              <div
+                className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
+                  form.activo
+                    ? 'border-emerald-200 bg-emerald-50'
+                    : 'border-slate-200 bg-slate-50'
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-900">
+                    {form.activo ? 'Producto activo' : 'Producto inactivo'}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {form.activo
+                      ? 'Se vende en POS y aparece en la tienda MARGHOT'
+                      : 'No se vende ni aparece en POS ni en /pedir'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.activo}
+                  onClick={() => updateForm('activo', !form.activo)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                    form.activo ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                      form.activo ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
 
               {error && <p className="text-sm text-red-600">{error}</p>}
