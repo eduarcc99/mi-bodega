@@ -11,6 +11,7 @@ import { ComprasPage } from '@/pages/ComprasPage'
 import { DevolucionesPage } from '@/pages/DevolucionesPage'
 import { ReportesPage } from '@/pages/ReportesPage'
 import { PedidosWebPage } from '@/pages/PedidosWebPage'
+import { ConsumoPage } from '@/pages/ConsumoPage'
 import { TiendaCartProvider } from '@/tienda/context/TiendaCartContext'
 import { TiendaLayout } from '@/tienda/components/TiendaLayout'
 import { TiendaPage } from '@/tienda/pages/TiendaPage'
@@ -45,6 +46,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/pos" element={<PosPage />} />
               <Route path="/pedidos-web" element={<PedidosWebPage />} />
+              <Route path="/consumo" element={<ConsumoPage />} />
               <Route path="/devoluciones" element={<DevolucionesPage />} />
               <Route path="/cierre-caja" element={<CierreCajaPage />} />
 

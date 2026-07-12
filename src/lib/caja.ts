@@ -42,6 +42,9 @@ export interface ResumenCajaDia {
   devolucionesYape: number
   yapeEsperado: number
   efectivoEsperado: number
+  /** Informativo: consumo propio del día (no afecta efectivo) */
+  consumoPropioCosto: number
+  consumoPropioOportunidad: number
   ventas: VentaResumen[]
   gastos: GastoCaja[]
   movimientos: MovimientoCaja[]
@@ -73,7 +76,7 @@ export async function fetchUltimoCierre(): Promise<{ fecha: string; efectivo_dec
 export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<ResumenCajaDia> {
   const { desde, hasta } = localDayRangeISO(fecha)
 
-  const [ventasRes, gastosRes, cierreRes, ultimoCierre, devoluciones] = await Promise.all([
+  const [ventasRes, gastosRes, cierreRes, ultimoCierre, devoluciones, consumoRes] = await Promise.all([
     supabase
       .from('ventas')
       .select('id, total, metodo_pago, fecha')
@@ -93,6 +96,11 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
       .maybeSingle(),
     fetchUltimoCierre(),
     fetchDevolucionesDelDia(fecha),
+    supabase
+      .from('retiros_consumo')
+      .select('total_costo, total_venta_potencial')
+      .gte('fecha', desde)
+      .lte('fecha', hasta),
   ])
 
   const ventas = (ventasRes.data ?? []) as VentaResumen[]
@@ -130,6 +138,16 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
   }
 
   const efectivoEsperado = efectivoInicial + ventasEfectivo - totalGastos - devolucionesEfectivo
+
+  let consumoPropioCosto = 0
+  let consumoPropioVenta = 0
+  for (const r of consumoRes.data ?? []) {
+    consumoPropioCosto += Number(r.total_costo)
+    consumoPropioVenta += Number(r.total_venta_potencial)
+  }
+  consumoPropioCosto = Math.round(consumoPropioCosto * 100) / 100
+  const consumoPropioOportunidad =
+    Math.round((consumoPropioVenta - consumoPropioCosto) * 100) / 100
 
   const movimientos: MovimientoCaja[] = []
 
@@ -194,6 +212,8 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
     devolucionesYape,
     yapeEsperado,
     efectivoEsperado: Math.round(efectivoEsperado * 100) / 100,
+    consumoPropioCosto,
+    consumoPropioOportunidad,
     ventas,
     gastos,
     movimientos,

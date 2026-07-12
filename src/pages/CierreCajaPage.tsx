@@ -12,6 +12,8 @@ import {
   Smartphone,
   Banknote,
   Calculator,
+  ShoppingBasket,
+  Info,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMoney, todayLocalISO } from '@/lib/utils'
@@ -177,6 +179,26 @@ export function CierreCajaPage() {
           />
         </div>
       </div>
+
+      {(resumen?.consumoPropioCosto ?? 0) > 0 && (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+          <div className="flex items-start gap-2">
+            <ShoppingBasket className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">
+                Consumo propio hoy: {formatMoney(resumen!.consumoPropioCosto)} (al costo)
+              </p>
+              <p className="mt-0.5 text-xs text-orange-800/80">
+                Dejó de ganar {formatMoney(resumen!.consumoPropioOportunidad)} ·{' '}
+                <span className="inline-flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Solo informativo — no se resta del efectivo de caja
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Explicación tipo dueña */}
       <div className="rounded-xl border-2 border-teal-200 bg-teal-50 p-5">

@@ -20,6 +20,13 @@ export interface KpisPeriodo {
   gananciaNeta: number
 }
 
+export interface KpisConsumo {
+  totalCosto: number
+  totalVentaPotencial: number
+  oportunidadPerdida: number
+  cantidadRetiros: number
+}
+
 export function getEtiquetasKpi(periodo: PeriodoFiltro): { ventas: string; ganancia: string } {
   switch (periodo) {
     case 'hoy':
@@ -28,6 +35,17 @@ export function getEtiquetasKpi(periodo: PeriodoFiltro): { ventas: string; ganan
       return { ventas: 'Ventas netas de la semana', ganancia: 'Ganancia neta de la semana' }
     case 'mes':
       return { ventas: 'Ventas netas del mes', ganancia: 'Ganancia neta del mes' }
+  }
+}
+
+export function getEtiquetaConsumo(periodo: PeriodoFiltro): string {
+  switch (periodo) {
+    case 'hoy':
+      return 'Consumo propio hoy'
+    case 'semana':
+      return 'Consumo propio de la semana'
+    case 'mes':
+      return 'Consumo propio del mes'
   }
 }
 
@@ -130,6 +148,32 @@ export async function fetchVentasEnRango(desde: Date, hasta: Date): Promise<Vent
 
   if (error) throw new Error(error.message)
   return (data as unknown as VentaConDetalles[]) ?? []
+}
+
+export async function fetchConsumoEnRango(desde: Date, hasta: Date): Promise<KpisConsumo> {
+  const { data, error } = await supabase
+    .from('retiros_consumo')
+    .select('id, total_costo, total_venta_potencial')
+    .gte('fecha', desde.toISOString())
+    .lte('fecha', hasta.toISOString())
+
+  if (error) throw new Error(error.message)
+
+  const rows = data ?? []
+  let totalCosto = 0
+  let totalVentaPotencial = 0
+
+  for (const r of rows) {
+    totalCosto += Number(r.total_costo)
+    totalVentaPotencial += Number(r.total_venta_potencial)
+  }
+
+  return {
+    totalCosto: Math.round(totalCosto * 100) / 100,
+    totalVentaPotencial: Math.round(totalVentaPotencial * 100) / 100,
+    oportunidadPerdida: Math.round((totalVentaPotencial - totalCosto) * 100) / 100,
+    cantidadRetiros: rows.length,
+  }
 }
 
 export function calcKpisPeriodo(

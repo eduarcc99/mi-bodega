@@ -7,6 +7,8 @@ import {
   Package,
   Loader2,
   RefreshCw,
+  ShoppingBasket,
+  Info,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMoney } from '@/lib/utils'
@@ -14,14 +16,17 @@ import {
   type PeriodoFiltro,
   type KpisInventario,
   type KpisPeriodo,
+  type KpisConsumo,
   type Alerta,
   type VencimientoResumen,
   fetchKpisInventario,
   fetchVentasEnRango,
+  fetchConsumoEnRango,
   fetchAlertas,
   fetchMapaVencimientos,
   getRangoPeriodo,
   getEtiquetasKpi,
+  getEtiquetaConsumo,
   calcKpisPeriodo,
   calcTopProductos,
   calcVentasPorCategoria,
@@ -62,6 +67,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [kpisPeriodo, setKpisPeriodo] = useState<KpisPeriodo | null>(null)
   const [kpisInventario, setKpisInventario] = useState<KpisInventario | null>(null)
+  const [kpisConsumo, setKpisConsumo] = useState<KpisConsumo | null>(null)
   const [alertas, setAlertas] = useState<Alerta[]>([])
 
   const [topProductos, setTopProductos] = useState<ReturnType<typeof calcTopProductos>>([])
@@ -74,16 +80,18 @@ export function DashboardPage() {
     setLoading(true)
     try {
       const { desde, hasta } = getRangoPeriodo(periodo)
-      const [inventario, ventas, devoluciones, alertasData, vencData] = await Promise.all([
+      const [inventario, ventas, devoluciones, consumo, alertasData, vencData] = await Promise.all([
         fetchKpisInventario(),
         fetchVentasEnRango(desde, hasta),
         fetchDevolucionesEnRango(desde, hasta),
+        fetchConsumoEnRango(desde, hasta),
         fetchAlertas(),
         fetchMapaVencimientos(),
       ])
 
       setKpisInventario(inventario)
       setKpisPeriodo(calcKpisPeriodo(ventas, devoluciones))
+      setKpisConsumo(consumo)
       setAlertas(alertasData)
       setVencimientos(vencData)
       setTopProductos(calcTopProductos(ventas, devoluciones))
@@ -185,6 +193,48 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
+
+          {kpisConsumo && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-5 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-lg bg-orange-500 p-2.5 text-white">
+                    <ShoppingBasket className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-orange-900">{getEtiquetaConsumo(periodo)}</p>
+                    <p className="mt-1 text-2xl font-bold text-orange-800">
+                      {formatMoney(kpisConsumo.totalCosto)}
+                    </p>
+                    <p className="mt-1 text-xs text-orange-700/80">
+                      Mercadería retirada al costo
+                      {kpisConsumo.cantidadRetiros > 0
+                        ? ` · ${kpisConsumo.cantidadRetiros} retiro${kpisConsumo.cantidadRetiros === 1 ? '' : 's'}`
+                        : ' · sin retiros'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:text-right">
+                  <div>
+                    <p className="text-xs text-orange-700/70">Si se hubiera vendido</p>
+                    <p className="font-semibold text-slate-800">
+                      {formatMoney(kpisConsumo.totalVentaPotencial)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-orange-700/70">Dejó de ganar</p>
+                    <p className="font-semibold text-slate-900">
+                      {formatMoney(kpisConsumo.oportunidadPerdida)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-orange-800/70">
+                <Info className="h-3.5 w-3.5 shrink-0" />
+                Solo informativo — no afecta ventas ni el efectivo de caja
+              </p>
+            </div>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
