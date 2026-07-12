@@ -42,6 +42,7 @@ export async function fetchReporteVentas(desde: string, hasta: string): Promise<
 
   const filasVentas: FilaReporte[] = (ventasRes.data ?? []).map((v) => ({
     ticket: v.id.slice(0, 8).toUpperCase(),
+    venta_id: v.id,
     fecha: new Date(v.fecha).toLocaleString('es-PE'),
     cajero: (v.perfiles as unknown as { nombre: string } | null)?.nombre ?? '—',
     metodo: v.metodo_pago === 'yape' ? 'Yape' : v.metodo_pago === 'otro' ? 'Otro' : 'Efectivo',
@@ -51,6 +52,7 @@ export async function fetchReporteVentas(desde: string, hasta: string): Promise<
 
   const filasDevoluciones: FilaReporte[] = devoluciones.map((dev) => ({
     ticket: dev.venta_id.slice(0, 8).toUpperCase(),
+    venta_id: dev.venta_id,
     fecha: new Date(dev.fecha).toLocaleString('es-PE'),
     cajero: '—',
     metodo: 'Devolución',

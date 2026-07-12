@@ -20,6 +20,8 @@ import {
 } from '@/lib/reportes'
 import { exportarPDF, exportarExcel } from '@/lib/export'
 import { formatMoney, todayLocalISO } from '@/lib/utils'
+import { fetchTicketDetalle, type TicketDetalle } from '@/lib/tickets'
+import { VentaTicket } from '@/components/pos/VentaTicket'
 
 const iconos: Record<TipoReporte, typeof FileText> = {
   ventas: ShoppingCart,
@@ -39,6 +41,22 @@ function defaultHasta(): string {
   return todayLocalISO()
 }
 
+function esColumnaDinero(key: string): boolean {
+  return (
+    key.includes('total') ||
+    key.includes('monto') ||
+    key.includes('costo') ||
+    key.includes('valor') ||
+    key.includes('precio') ||
+    key.includes('esperado') ||
+    key.includes('declarado') ||
+    key.includes('diferencia') ||
+    key.includes('gastos') ||
+    key.includes('efectivo') ||
+    key.includes('perdida')
+  )
+}
+
 export function ReportesPage() {
   const [tipo, setTipo] = useState<TipoReporte>('ventas')
   const [desde, setDesde] = useState(defaultDesde())
@@ -48,8 +66,28 @@ export function ReportesPage() {
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null)
   const [error, setError] = useState('')
   const [incluirProductos, setIncluirProductos] = useState(false)
+  const [ticketDetalle, setTicketDetalle] = useState<TicketDetalle | null>(null)
+  const [abriendoTicket, setAbriendoTicket] = useState(false)
 
   const config = REPORTES_DISPONIBLES.find((r) => r.id === tipo)!
+
+  async function abrirTicketDesdeReporte(ventaId: string) {
+    if (!ventaId || String(ventaId).length < 8) return
+    setAbriendoTicket(true)
+    setError('')
+    try {
+      const t = await fetchTicketDetalle(String(ventaId))
+      if (!t) {
+        setError('No se encontró el ticket')
+        return
+      }
+      setTicketDetalle(t)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al abrir ticket')
+    } finally {
+      setAbriendoTicket(false)
+    }
+  }
 
   async function handleVistaPrevia() {
     setLoading(true)
@@ -216,50 +254,136 @@ export function ReportesPage() {
           {reporte.filas.length === 0 ? (
             <p className="py-12 text-center text-sm text-slate-400">No hay datos en este período</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-slate-600">
-                  <tr>
-                    {reporte.columnas.map((col) => (
-                      <th key={col.key} className="px-4 py-3 font-medium whitespace-nowrap">
-                        {col.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {reporte.filas.slice(0, 100).map((fila, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
+            <>
+              {/* Móvil: cards (sin scroll horizontal) */}
+              <div className="space-y-3 p-4 md:hidden">
+                {reporte.filas.slice(0, 100).map((fila, i) => {
+                  const puedeAbrir =
+                    tipo === 'ventas' &&
+                    fila.estado === 'Completada' &&
+                    typeof fila.venta_id === 'string'
+                  return (
+                    <div
+                      key={i}
+                      role={puedeAbrir ? 'button' : undefined}
+                      tabIndex={puedeAbrir ? 0 : undefined}
+                      onClick={() => puedeAbrir && abrirTicketDesdeReporte(String(fila.venta_id))}
+                      onKeyDown={(e) => {
+                        if (puedeAbrir && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault()
+                          abrirTicketDesdeReporte(String(fila.venta_id))
+                        }
+                      }}
+                      className={`rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-sm ${
+                        puedeAbrir ? 'cursor-pointer hover:border-teal-300 hover:bg-teal-50/50' : ''
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        {reporte.columnas.map((col) => {
+                          const raw = fila[col.key]
+                          const valor =
+                            typeof raw === 'number' && esColumnaDinero(col.key)
+                              ? formatMoney(Number(raw))
+                              : String(raw ?? '—')
+                          return (
+                            <div key={col.key} className="flex items-start justify-between gap-3">
+                              <span className="shrink-0 text-xs text-slate-500">{col.label}</span>
+                              <span
+                                className={`max-w-[60%] break-words text-right font-medium ${
+                                  col.key === 'ticket' && puedeAbrir
+                                    ? 'text-teal-700 underline'
+                                    : 'text-slate-800'
+                                }`}
+                              >
+                                {valor}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {puedeAbrir && (
+                        <p className="mt-2 text-center text-[10px] text-teal-600">
+                          Toca para ver boleta / productos
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+                {reporte.filas.length > 100 && (
+                  <p className="text-xs text-slate-400">
+                    Mostrando 100 de {reporte.filas.length} — descarga PDF/Excel para ver todo
+                  </p>
+                )}
+              </div>
+
+              {/* Desktop: tabla */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-slate-600">
+                    <tr>
                       {reporte.columnas.map((col) => (
-                        <td key={col.key} className="px-4 py-2.5 whitespace-nowrap text-slate-700">
-                          {typeof fila[col.key] === 'number' &&
-                          (col.key.includes('total') ||
-                            col.key.includes('monto') ||
-                            col.key.includes('costo') ||
-                            col.key.includes('valor') ||
-                            col.key.includes('precio') ||
-                            col.key.includes('esperado') ||
-                            col.key.includes('declarado') ||
-                            col.key.includes('diferencia') ||
-                            col.key.includes('gastos') ||
-                            col.key.includes('efectivo') ||
-                            col.key.includes('perdida'))
-                            ? formatMoney(Number(fila[col.key]))
-                            : String(fila[col.key] ?? '')}
-                        </td>
+                        <th key={col.key} className="px-4 py-3 font-medium whitespace-nowrap">
+                          {col.label}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              {reporte.filas.length > 100 && (
-                <p className="px-4 py-3 text-xs text-slate-400">
-                  Mostrando 100 de {reporte.filas.length} — descarga PDF/Excel para ver todo
-                </p>
-              )}
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {reporte.filas.slice(0, 100).map((fila, i) => {
+                      const puedeAbrir =
+                        tipo === 'ventas' &&
+                        fila.estado === 'Completada' &&
+                        typeof fila.venta_id === 'string'
+                      return (
+                        <tr
+                          key={i}
+                          className={puedeAbrir ? 'cursor-pointer hover:bg-teal-50' : 'hover:bg-slate-50'}
+                          onClick={() => puedeAbrir && abrirTicketDesdeReporte(String(fila.venta_id))}
+                          title={puedeAbrir ? 'Ver boleta con productos' : undefined}
+                        >
+                          {reporte.columnas.map((col) => (
+                            <td
+                              key={col.key}
+                              className={`px-4 py-2.5 whitespace-nowrap ${
+                                col.key === 'ticket' && puedeAbrir
+                                  ? 'font-medium text-teal-700 underline'
+                                  : 'text-slate-700'
+                              }`}
+                            >
+                              {typeof fila[col.key] === 'number' && esColumnaDinero(col.key)
+                                ? formatMoney(Number(fila[col.key]))
+                                : String(fila[col.key] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                {reporte.filas.length > 100 && (
+                  <p className="px-4 py-3 text-xs text-slate-400">
+                    Mostrando 100 de {reporte.filas.length} — descarga PDF/Excel para ver todo
+                  </p>
+                )}
+              </div>
+            </>
           )}
         </div>
+      )}
+
+      {abriendoTicket && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30">
+          <Loader2 className="h-10 w-10 animate-spin text-white" />
+        </div>
+      )}
+
+      {ticketDetalle && (
+        <VentaTicket
+          venta={ticketDetalle}
+          cajeroNombre={ticketDetalle.cajero_nombre}
+          onClose={() => setTicketDetalle(null)}
+          historial
+        />
       )}
     </div>
   )

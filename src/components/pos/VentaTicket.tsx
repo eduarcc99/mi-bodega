@@ -1,4 +1,4 @@
-import { Printer, X, CheckCircle } from 'lucide-react'
+import { Printer, X, CheckCircle, Receipt } from 'lucide-react'
 import type { VentaCompletada } from '@/lib/pos'
 import { cartItemSubtotal, cartTotal, etiquetaCantidadItem } from '@/lib/pos'
 import { formatMoney } from '@/lib/utils'
@@ -7,9 +7,21 @@ interface VentaTicketProps {
   venta: VentaCompletada
   cajeroNombre: string
   onClose: () => void
+  /** Título del encabezado (default: venta recién registrada) */
+  titulo?: string
+  /** Texto del botón primario (default: Nueva venta) */
+  botonCerrar?: string
+  historial?: boolean
 }
 
-export function VentaTicket({ venta, cajeroNombre, onClose }: VentaTicketProps) {
+export function VentaTicket({
+  venta,
+  cajeroNombre,
+  onClose,
+  titulo,
+  botonCerrar,
+  historial = false,
+}: VentaTicketProps) {
   const metodoLabel = {
     efectivo: 'Efectivo',
     yape: 'Yape',
@@ -25,8 +37,10 @@ export function VentaTicket({ venta, cajeroNombre, onClose }: VentaTicketProps) 
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl print:max-w-none print:shadow-none">
         <div className="flex items-center justify-between border-b border-slate-100 p-4 print:hidden">
           <div className="flex items-center gap-2 text-emerald-600">
-            <CheckCircle className="h-5 w-5" />
-            <span className="font-semibold">Venta registrada</span>
+            {historial ? <Receipt className="h-5 w-5" /> : <CheckCircle className="h-5 w-5" />}
+            <span className="font-semibold">
+              {titulo ?? (historial ? 'Ticket / boleta' : 'Venta registrada')}
+            </span>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="h-5 w-5" />
@@ -75,13 +89,13 @@ export function VentaTicket({ venta, cajeroNombre, onClose }: VentaTicketProps) 
             className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 py-3 font-medium text-slate-700 hover:bg-slate-50"
           >
             <Printer className="h-4 w-4" />
-            Imprimir
+            {historial ? 'Reimprimir' : 'Imprimir'}
           </button>
           <button
             onClick={onClose}
             className="flex-1 rounded-lg bg-teal-600 py-3 font-semibold text-white hover:bg-teal-700"
           >
-            Nueva venta
+            {botonCerrar ?? (historial ? 'Cerrar' : 'Nueva venta')}
           </button>
         </div>
       </div>

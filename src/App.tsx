@@ -12,6 +12,7 @@ import { DevolucionesPage } from '@/pages/DevolucionesPage'
 import { ReportesPage } from '@/pages/ReportesPage'
 import { PedidosWebPage } from '@/pages/PedidosWebPage'
 import { ConsumoPage } from '@/pages/ConsumoPage'
+import { HistorialTicketsPage } from '@/pages/HistorialTicketsPage'
 import { TiendaCartProvider } from '@/tienda/context/TiendaCartContext'
 import { TiendaLayout } from '@/tienda/components/TiendaLayout'
 import { TiendaPage } from '@/tienda/pages/TiendaPage'
@@ -45,6 +46,7 @@ export default function App() {
             <Route index element={<CajeroRedirect />} />
             <Route element={<Layout />}>
               <Route path="/pos" element={<PosPage />} />
+              <Route path="/tickets" element={<HistorialTicketsPage />} />
               <Route path="/pedidos-web" element={<PedidosWebPage />} />
               <Route path="/consumo" element={<ConsumoPage />} />
               <Route path="/devoluciones" element={<DevolucionesPage />} />
