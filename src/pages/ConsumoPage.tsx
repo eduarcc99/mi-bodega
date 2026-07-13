@@ -35,6 +35,7 @@ import {
   permiteVentaUnidadSuelta,
   completarConsumo,
 } from '@/lib/consumo'
+import { ConsumoTicket } from '@/components/consumo/ConsumoTicket'
 
 const CameraScannerModal = lazy(() =>
   import('@/components/pos/CameraScannerModal').then((m) => ({ default: m.CameraScannerModal })),
@@ -430,7 +431,7 @@ export function ConsumoPage() {
             {processing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
             Confirmar retiro
           </button>
-          <p className="mt-2 text-center text-xs text-slate-400">Sin boleta · sin pago · no toca caja</p>
+          <p className="mt-2 text-center text-xs text-slate-400">Genera ticket imprimible · no toca caja</p>
         </div>
       </div>
 
@@ -532,52 +533,15 @@ export function ConsumoPage() {
         </Suspense>
       )}
 
-      {completado && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-4 flex flex-col items-center text-center">
-              <div className="mb-3 rounded-full bg-orange-100 p-3">
-                <CheckCircle2 className="h-8 w-8 text-orange-600" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900">Retiro registrado</h3>
-              <p className="mt-1 text-sm text-slate-500">Stock actualizado · caja intacta</p>
-            </div>
-
-            <div className="space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-600">Al costo</span>
-                <span className="font-bold text-orange-700">{formatMoney(completado.total_costo)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">Si se vendía</span>
-                <span>{formatMoney(completado.total_venta_potencial)}</span>
-              </div>
-              <div className="flex justify-between border-t border-slate-200 pt-2 font-medium">
-                <span className="text-slate-700">Dejó de ganar</span>
-                <span>{formatMoney(completado.oportunidad_perdida)}</span>
-              </div>
-            </div>
-
-            <ul className="mt-4 max-h-40 space-y-1 overflow-y-auto text-sm text-slate-600">
-              {completado.items.map((i) => (
-                <li key={i.key} className="flex justify-between gap-2">
-                  <span className="truncate">{i.nombre}</span>
-                  <span className="shrink-0">{etiquetaCantidadItem(i)}</span>
-                </li>
-              ))}
-            </ul>
-
-            <button
-              onClick={() => {
-                setCompletado(null)
-                focusSearch()
-              }}
-              className="mt-6 w-full rounded-lg bg-orange-600 py-3 font-semibold text-white hover:bg-orange-700"
-            >
-              Listo
-            </button>
-          </div>
-        </div>
+      {completado && perfil && (
+        <ConsumoTicket
+          consumo={completado}
+          registradoPor={perfil.nombre}
+          onClose={() => {
+            setCompletado(null)
+            focusSearch()
+          }}
+        />
       )}
     </div>
   )

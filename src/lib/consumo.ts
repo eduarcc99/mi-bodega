@@ -12,7 +12,7 @@ import {
   stockNecesario,
 } from '@/lib/pos'
 import type { Producto } from '@/types/database'
-import { productoVencido } from '@/lib/utils'
+import { localDayRangeISO, productoVencido, todayLocalISO } from '@/lib/utils'
 
 export type { CartItem, ModoVenta }
 export {
@@ -32,7 +32,21 @@ export interface ConsumoCompletado {
   total_venta_potencial: number
   oportunidad_perdida: number
   fecha: string
+  motivo: string | null
+  notas: string | null
   items: CartItem[]
+}
+
+export interface ConsumoTicketResumen {
+  id: string
+  fecha: string
+  total_costo: number
+  motivo: string | null
+  registrado_por_nombre: string
+}
+
+export interface ConsumoTicketDetalle extends ConsumoCompletado {
+  registrado_por_nombre: string
 }
 
 /** Subtotal al costo (mercadería consumida) */
@@ -155,7 +169,136 @@ export async function completarConsumo(params: {
         (Number(retiro.total_venta_potencial) - Number(retiro.total_costo)) * 100,
       ) / 100,
     fecha: retiro.fecha,
+    motivo: motivo?.trim() || null,
+    notas: notas?.trim() || null,
     items: catalogados,
+  }
+}
+
+function mapConsumoDetalleItems(
+  detalles: Array<{
+    id: string
+    producto_id: string | null
+    nombre_producto: string
+    cantidad: number
+    unidades_cobradas: number
+    modo_venta: string
+    costo_unitario: number
+    precio_venta_unitario: number
+  }>,
+): CartItem[] {
+  return detalles.map((d) => {
+    const modo = (d.modo_venta || 'normal') as ModoVenta
+    const unidades = Number(d.unidades_cobradas) || Number(d.cantidad)
+    return {
+      key: d.id,
+      producto_id: d.producto_id,
+      nombre: d.nombre_producto,
+      cantidad: unidades,
+      precio_original: Number(d.precio_venta_unitario),
+      precio_unitario: Number(d.precio_venta_unitario),
+      descuento: 0,
+      costo_unitario: Number(d.costo_unitario),
+      unidad: modo === 'peso' ? 'kg' : 'unidad',
+      stock_disponible: null,
+      es_generica: !d.producto_id,
+      cantidad_mayor: null,
+      precio_mayor: null,
+      modo_venta: modo,
+      peso_estimado_unidad:
+        modo === 'unidad_suelta' && unidades > 0
+          ? Math.round((Number(d.cantidad) / unidades) * 1000) / 1000
+          : null,
+    }
+  })
+}
+
+export async function fetchConsumosTicketDelDia(
+  fecha = todayLocalISO(),
+): Promise<ConsumoTicketResumen[]> {
+  const { desde, hasta } = localDayRangeISO(fecha)
+  const { data, error } = await supabase
+    .from('retiros_consumo')
+    .select('id, fecha, total_costo, motivo, perfiles:registrado_por(nombre)')
+    .gte('fecha', desde)
+    .lte('fecha', hasta)
+    .order('fecha', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    fecha: r.fecha,
+    total_costo: Number(r.total_costo),
+    motivo: r.motivo,
+    registrado_por_nombre:
+      (r.perfiles as unknown as { nombre: string } | null)?.nombre ?? '—',
+  }))
+}
+
+export async function buscarConsumosTicket(query: string): Promise<ConsumoTicketResumen[]> {
+  const q = query.trim().toLowerCase()
+  if (!q) return fetchConsumosTicketDelDia()
+
+  if (q.length >= 4) {
+    const { data, error } = await supabase
+      .from('retiros_consumo')
+      .select('id, fecha, total_costo, motivo, perfiles:registrado_por(nombre)')
+      .ilike('id', `${q}%`)
+      .order('fecha', { ascending: false })
+      .limit(20)
+
+    if (error) throw new Error(error.message)
+    if (data?.length) {
+      return data.map((r) => ({
+        id: r.id,
+        fecha: r.fecha,
+        total_costo: Number(r.total_costo),
+        motivo: r.motivo,
+        registrado_por_nombre:
+          (r.perfiles as unknown as { nombre: string } | null)?.nombre ?? '—',
+      }))
+    }
+  }
+
+  return fetchConsumosTicketDelDia()
+}
+
+export async function fetchConsumoTicketDetalle(
+  retiroId: string,
+): Promise<ConsumoTicketDetalle | null> {
+  const { data, error } = await supabase
+    .from('retiros_consumo')
+    .select(`
+      id, fecha, total_costo, total_venta_potencial, motivo, notas,
+      perfiles:registrado_por(nombre),
+      retiro_consumo_detalles(
+        id, producto_id, nombre_producto, cantidad, unidades_cobradas, modo_venta,
+        costo_unitario, precio_venta_unitario
+      )
+    `)
+    .eq('id', retiroId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) return null
+
+  const items = mapConsumoDetalleItems(data.retiro_consumo_detalles ?? [])
+  const total_costo = Number(data.total_costo)
+  const total_venta_potencial = Number(data.total_venta_potencial)
+
+  return {
+    id: data.id,
+    fecha: data.fecha,
+    total_costo,
+    total_venta_potencial,
+    oportunidad_perdida:
+      Math.round((total_venta_potencial - total_costo) * 100) / 100,
+    motivo: data.motivo,
+    notas: data.notas,
+    items,
+    registrado_por_nombre:
+      (data.perfiles as unknown as { nombre: string } | null)?.nombre ?? '—',
   }
 }
 

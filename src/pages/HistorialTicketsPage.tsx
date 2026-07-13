@@ -7,6 +7,7 @@ import {
   Eye,
   Banknote,
   Smartphone,
+  ShoppingBasket,
 } from 'lucide-react'
 import { formatMoney, todayLocalISO } from '@/lib/utils'
 import {
@@ -17,23 +18,52 @@ import {
   type TicketResumen,
   type TicketDetalle,
 } from '@/lib/tickets'
+import {
+  buscarConsumosTicket,
+  fetchConsumoTicketDetalle,
+  fetchConsumosTicketDelDia,
+  type ConsumoTicketDetalle,
+  type ConsumoTicketResumen,
+} from '@/lib/consumo'
 import { VentaTicket } from '@/components/pos/VentaTicket'
+import { ConsumoTicket } from '@/components/consumo/ConsumoTicket'
+
+type TicketListItem =
+  | ({ tipo: 'venta' } & TicketResumen)
+  | ({ tipo: 'consumo' } & ConsumoTicketResumen)
+
+function mergeTickets(
+  ventas: TicketResumen[],
+  consumos: ConsumoTicketResumen[],
+): TicketListItem[] {
+  const items: TicketListItem[] = [
+    ...ventas.map((v) => ({ tipo: 'venta' as const, ...v })),
+    ...consumos.map((c) => ({ tipo: 'consumo' as const, ...c })),
+  ]
+  return items.sort(
+    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
+  )
+}
 
 export function HistorialTicketsPage() {
   const [fecha, setFecha] = useState(todayLocalISO())
   const [busqueda, setBusqueda] = useState('')
-  const [tickets, setTickets] = useState<TicketResumen[]>([])
+  const [tickets, setTickets] = useState<TicketListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [detalle, setDetalle] = useState<TicketDetalle | null>(null)
+  const [detalleVenta, setDetalleVenta] = useState<TicketDetalle | null>(null)
+  const [detalleConsumo, setDetalleConsumo] = useState<ConsumoTicketDetalle | null>(null)
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
 
   const cargarDia = useCallback(async (f: string) => {
     setLoading(true)
     setError('')
     try {
-      const data = await fetchTicketsDelDia(f)
-      setTickets(data)
+      const [ventas, consumos] = await Promise.all([
+        fetchTicketsDelDia(f),
+        fetchConsumosTicketDelDia(f),
+      ])
+      setTickets(mergeTickets(ventas, consumos))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar tickets')
     } finally {
@@ -55,8 +85,11 @@ export function HistorialTicketsPage() {
         await cargarDia(fecha)
         return
       }
-      const data = await buscarTickets(busqueda)
-      setTickets(data)
+      const [ventas, consumos] = await Promise.all([
+        buscarTickets(busqueda),
+        buscarConsumosTicket(busqueda),
+      ])
+      setTickets(mergeTickets(ventas, consumos))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al buscar')
     } finally {
@@ -64,16 +97,27 @@ export function HistorialTicketsPage() {
     }
   }
 
-  async function abrirTicket(id: string) {
+  async function abrirTicket(item: TicketListItem) {
     setCargandoDetalle(true)
     setError('')
+    setDetalleVenta(null)
+    setDetalleConsumo(null)
     try {
-      const t = await fetchTicketDetalle(id)
-      if (!t) {
-        setError('Ticket no encontrado')
-        return
+      if (item.tipo === 'venta') {
+        const t = await fetchTicketDetalle(item.id)
+        if (!t) {
+          setError('Ticket no encontrado')
+          return
+        }
+        setDetalleVenta(t)
+      } else {
+        const t = await fetchConsumoTicketDetalle(item.id)
+        if (!t) {
+          setError('Ticket no encontrado')
+          return
+        }
+        setDetalleConsumo(t)
       }
-      setDetalle(t)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al abrir ticket')
     } finally {
@@ -96,7 +140,7 @@ export function HistorialTicketsPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Historial de tickets</h1>
         <p className="text-slate-500">
-          Vuelve a ver la boleta con productos y reimprime cuando lo necesites
+          Ventas y consumo propio · vuelve a ver la boleta y reimprime
         </p>
       </div>
 
@@ -158,29 +202,44 @@ export function HistorialTicketsPage() {
           </p>
           {tickets.map((t) => (
             <button
-              key={t.id}
+              key={`${t.tipo}-${t.id}`}
               type="button"
-              onClick={() => abrirTicket(t.id)}
+              onClick={() => abrirTicket(t)}
               disabled={cargandoDetalle}
               className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50 disabled:opacity-50"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50">
-                <Receipt className="h-5 w-5 text-teal-700" />
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                  t.tipo === 'consumo' ? 'bg-orange-50' : 'bg-teal-50'
+                }`}
+              >
+                {t.tipo === 'consumo' ? (
+                  <ShoppingBasket className="h-5 w-5 text-orange-700" />
+                ) : (
+                  <Receipt className="h-5 w-5 text-teal-700" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-slate-900">
-                  Ticket {codigoTicket(t.id)}
+                  {t.tipo === 'consumo' ? 'Consumo' : 'Venta'} {codigoTicket(t.id)}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {new Date(t.fecha).toLocaleString('es-PE')} · {t.cajero_nombre}
+                  {new Date(t.fecha).toLocaleString('es-PE')} ·{' '}
+                  {t.tipo === 'consumo' ? t.registrado_por_nombre : t.cajero_nombre}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-bold text-slate-900">{formatMoney(t.total)}</p>
-                <p className="flex items-center justify-end gap-1 text-xs text-slate-500">
-                  {metodoIcon(t.metodo_pago)}
-                  {metodoLabel(t.metodo_pago)}
+                <p className="font-bold text-slate-900">
+                  {formatMoney(t.tipo === 'consumo' ? t.total_costo : t.total)}
                 </p>
+                {t.tipo === 'venta' ? (
+                  <p className="flex items-center justify-end gap-1 text-xs text-slate-500">
+                    {metodoIcon(t.metodo_pago)}
+                    {metodoLabel(t.metodo_pago)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-orange-600">Al costo</p>
+                )}
               </div>
               <Eye className="h-4 w-4 shrink-0 text-slate-400" />
             </button>
@@ -194,11 +253,20 @@ export function HistorialTicketsPage() {
         </div>
       )}
 
-      {detalle && (
+      {detalleVenta && (
         <VentaTicket
-          venta={detalle}
-          cajeroNombre={detalle.cajero_nombre}
-          onClose={() => setDetalle(null)}
+          venta={detalleVenta}
+          cajeroNombre={detalleVenta.cajero_nombre}
+          onClose={() => setDetalleVenta(null)}
+          historial
+        />
+      )}
+
+      {detalleConsumo && (
+        <ConsumoTicket
+          consumo={detalleConsumo}
+          registradoPor={detalleConsumo.registrado_por_nombre}
+          onClose={() => setDetalleConsumo(null)}
           historial
         />
       )}
