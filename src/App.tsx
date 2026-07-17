@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import { ProtectedRoute, AdminRoute, CajeroRedirect } from '@/components/ProtectedRoute'
 import { Layout } from '@/components/Layout'
 import { LoginPage } from '@/pages/LoginPage'
@@ -24,8 +25,9 @@ import { ConfirmadoPage } from '@/tienda/pages/ConfirmadoPage'
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
@@ -67,5 +69,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   )
 }

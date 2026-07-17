@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Layers,
   Loader2,
@@ -14,10 +15,16 @@ import {
 } from '@/lib/lotes'
 
 export function LotesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filtroPorVencer = searchParams.get('filtro') === 'por_vencer'
   const [grupos, setGrupos] = useState<LotePorProducto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [soloPorVencer, setSoloPorVencer] = useState(false)
+  const [soloPorVencer, setSoloPorVencer] = useState(filtroPorVencer)
+
+  useEffect(() => {
+    if (filtroPorVencer) setSoloPorVencer(true)
+  }, [filtroPorVencer])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,11 +68,20 @@ export function LotesPage() {
           <input
             type="checkbox"
             checked={soloPorVencer}
-            onChange={(e) => setSoloPorVencer(e.target.checked)}
+            onChange={(e) => {
+              setSoloPorVencer(e.target.checked)
+              if (e.target.checked) setSearchParams({ filtro: 'por_vencer' })
+              else setSearchParams({})
+            }}
             className="rounded border-slate-300"
           />
           Solo vencidos o próximos 15 días
         </label>
+        {filtroPorVencer && (
+          <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
+            Filtro desde dashboard
+          </span>
+        )}
         <p className="text-xs text-slate-400">
           Al vender, el sistema descuenta solo del lote que vence antes (FEFO)
         </p>

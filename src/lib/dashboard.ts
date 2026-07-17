@@ -4,7 +4,7 @@ import {
   totalDevoluciones,
   type DevolucionEnRango,
 } from '@/lib/devoluciones'
-import { diasHastaVencimiento, productoVencido, stockBajo } from '@/lib/utils'
+import { diasHastaVencimiento, productoVencido, stockBajo, todayLocalISO } from '@/lib/utils'
 import type { Producto } from '@/types/database'
 
 export type PeriodoFiltro = 'hoy' | 'semana' | 'mes'
@@ -27,14 +27,49 @@ export interface KpisConsumo {
   cantidadRetiros: number
 }
 
-export function getEtiquetasKpi(periodo: PeriodoFiltro): { ventas: string; ganancia: string } {
+export interface KpisCompras {
+  total: number
+  cantidad: number
+}
+
+function parseFechaLocal(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function formatFechaCorta(iso: string): string {
+  return new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' }).format(
+    parseFechaLocal(iso),
+  )
+}
+
+export function getEtiquetasKpi(
+  periodo: PeriodoFiltro,
+  fechaReferencia = todayLocalISO(),
+): { ventas: string; ganancia: string; compras: string; rango: string } {
+  const dia = formatFechaCorta(fechaReferencia)
   switch (periodo) {
     case 'hoy':
-      return { ventas: 'Ventas netas del día', ganancia: 'Ganancia neta hoy' }
+      return {
+        ventas: `Ventas netas · ${dia}`,
+        ganancia: `Ganancia neta · ${dia}`,
+        compras: `Compras · ${dia}`,
+        rango: dia,
+      }
     case 'semana':
-      return { ventas: 'Ventas netas de la semana', ganancia: 'Ganancia neta de la semana' }
+      return {
+        ventas: 'Ventas netas (7 días)',
+        ganancia: 'Ganancia neta (7 días)',
+        compras: 'Compras (7 días)',
+        rango: `7 días hasta ${dia}`,
+      }
     case 'mes':
-      return { ventas: 'Ventas netas del mes', ganancia: 'Ganancia neta del mes' }
+      return {
+        ventas: 'Ventas netas (30 días)',
+        ganancia: 'Ganancia neta (30 días)',
+        compras: 'Compras (30 días)',
+        rango: `30 días hasta ${dia}`,
+      }
   }
 }
 
@@ -109,9 +144,13 @@ function endOfDay(d = new Date()): Date {
   return x
 }
 
-export function getRangoPeriodo(periodo: PeriodoFiltro): { desde: Date; hasta: Date } {
-  const hasta = endOfDay()
-  const desde = startOfDay()
+export function getRangoPeriodo(
+  periodo: PeriodoFiltro,
+  fechaReferencia = todayLocalISO(),
+): { desde: Date; hasta: Date; desdeISO: string; hastaISO: string } {
+  const base = parseFechaLocal(fechaReferencia)
+  const hasta = endOfDay(base)
+  const desde = startOfDay(new Date(base))
 
   if (periodo === 'semana') {
     desde.setDate(desde.getDate() - 6)
@@ -119,7 +158,12 @@ export function getRangoPeriodo(periodo: PeriodoFiltro): { desde: Date; hasta: D
     desde.setDate(desde.getDate() - 29)
   }
 
-  return { desde, hasta }
+  return {
+    desde,
+    hasta,
+    desdeISO: todayLocalISO(desde),
+    hastaISO: todayLocalISO(hasta),
+  }
 }
 
 function lineaGanancia(cantidad: number, precio: number, descuento: number, costo: number): number {
@@ -148,6 +192,24 @@ export async function fetchVentasEnRango(desde: Date, hasta: Date): Promise<Vent
 
   if (error) throw new Error(error.message)
   return (data as unknown as VentaConDetalles[]) ?? []
+}
+
+export async function fetchComprasEnRango(desdeISO: string, hastaISO: string): Promise<KpisCompras> {
+  const { data, error } = await supabase
+    .from('compras')
+    .select('id, total')
+    .gte('fecha', desdeISO)
+    .lte('fecha', hastaISO)
+
+  if (error) throw new Error(error.message)
+
+  const rows = data ?? []
+  const total = rows.reduce((s, c) => s + Number(c.total), 0)
+
+  return {
+    total: Math.round(total * 100) / 100,
+    cantidad: rows.length,
+  }
 }
 
 export async function fetchConsumoEnRango(desde: Date, hasta: Date): Promise<KpisConsumo> {
@@ -205,24 +267,34 @@ export function calcKpisPeriodo(
 export async function fetchKpisInventario(): Promise<KpisInventario> {
   const { data: productosRes } = await supabase
     .from('productos')
-    .select('stock, stock_minimo, fecha_vencimiento, activo')
+    .select('stock, stock_minimo, activo')
     .eq('activo', true)
 
-  const productos = (productosRes ?? []) as Pick<
-    Producto,
-    'stock' | 'stock_minimo' | 'fecha_vencimiento' | 'activo'
-  >[]
+  const productos = (productosRes ?? []) as Pick<Producto, 'stock' | 'stock_minimo' | 'activo'>[]
 
   let stockBajoCount = 0
+  for (const p of productos) {
+    if (stockBajo(Number(p.stock), Number(p.stock_minimo))) stockBajoCount++
+  }
+
+  const { data: lotesRes } = await supabase
+    .from('producto_lotes')
+    .select('fecha_vencimiento, cantidad, productos(activo)')
+    .gt('cantidad', 0)
+    .not('fecha_vencimiento', 'is', null)
+
   let porVencer = 0
   let vencidos = 0
 
-  for (const p of productos) {
-    if (stockBajo(Number(p.stock), Number(p.stock_minimo))) stockBajoCount++
-    if (productoVencido(p.fecha_vencimiento)) {
+  for (const row of lotesRes ?? []) {
+    const prod = row.productos as unknown as { activo: boolean } | null
+    if (!prod?.activo) continue
+
+    const fv = row.fecha_vencimiento as string
+    if (productoVencido(fv)) {
       vencidos++
     } else {
-      const dias = diasHastaVencimiento(p.fecha_vencimiento)
+      const dias = diasHastaVencimiento(fv)
       if (dias !== null && dias <= 15) porVencer++
     }
   }

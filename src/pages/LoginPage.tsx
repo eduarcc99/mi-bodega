@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Store, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { BrandThemeToggle } from '@/components/BrandThemeToggle'
 import { isSupabaseConfigured } from '@/lib/supabase'
 
 export function LoginPage() {
@@ -28,14 +29,15 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-teal-700 via-teal-600 to-emerald-500 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-teal-700 via-teal-600 to-emerald-500 p-4 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl dark:bg-slate-900 dark:shadow-black/40">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-100">
-            <Store className="h-8 w-8 text-teal-700" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <BrandThemeToggle size="lg" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Mi Bodega</h1>
-          <p className="mt-1 text-sm text-slate-500">Sistema de control de inventario</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Mi Bodega</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sistema de control de inventario</p>
+          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">Toca el icono para cambiar tema claro / oscuro</p>
         </div>
 
         {!isSupabaseConfigured && (

@@ -49,6 +49,7 @@ interface ModalAgregar {
 export function PosPage() {
   const { perfil, isAdmin } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
+  const backdateInputRef = useRef<HTMLInputElement>(null)
 
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<Producto[]>([])
@@ -327,23 +328,58 @@ export function PosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Punto de venta</h1>
-          <p className="text-slate-500">Escanea o busca productos · Cajero: {perfil?.nombre}</p>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Punto de venta</h1>
+          {puedeBackdate && (
+            <div className="flex items-center">
+              <label
+                title={
+                  backdate
+                    ? `Venta con fecha pasada · ${backdate.replace('T', ' ')}`
+                    : 'Fecha pasada (ventas en papel)'
+                }
+                className={`relative flex cursor-pointer items-center justify-center rounded-lg p-2 transition ${
+                  backdate
+                    ? 'bg-teal-100 text-teal-700 ring-2 ring-teal-500/30 dark:bg-teal-950 dark:text-teal-300'
+                    : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300'
+                }`}
+              >
+                <input
+                  ref={backdateInputRef}
+                  type="datetime-local"
+                  value={backdate}
+                  onChange={(e) => setBackdate(e.target.value)}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  aria-label="Fecha pasada para la venta"
+                />
+                <Calendar className="pointer-events-none h-5 w-5" />
+                {backdate && (
+                  <span className="pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-teal-500" />
+                )}
+              </label>
+              {backdate && (
+                <button
+                  type="button"
+                  onClick={() => setBackdate('')}
+                  title="Usar fecha y hora actuales"
+                  aria-label="Quitar fecha pasada"
+                  className="ml-1 rounded-lg px-1.5 py-2 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        {puedeBackdate && (
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-slate-400" />
-            <input
-              type="datetime-local"
-              value={backdate}
-              onChange={(e) => setBackdate(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500"
-              title="Fecha/hora pasada (para ventas del día en papel)"
-            />
-          </div>
-        )}
+        <p className="text-slate-500 dark:text-slate-400">
+          Escanea o busca productos · Cajero: {perfil?.nombre}
+          {backdate && (
+            <span className="ml-1 text-teal-600 dark:text-teal-400">
+              · venta con fecha pasada
+            </span>
+          )}
+        </p>
       </div>
 
       <div className="relative flex gap-2">

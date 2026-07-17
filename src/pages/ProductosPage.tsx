@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, lazy, Suspense } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Plus,
   Search,
@@ -104,6 +105,8 @@ function EstadoProducto({ producto }: { producto: Producto }) {
 
 export function ProductosPage() {
   const { canSeeFinancials } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filtroStockBajo = searchParams.get('filtro') === 'stock_bajo'
   const [productos, setProductos] = useState<Producto[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [busqueda, setBusqueda] = useState('')
@@ -132,7 +135,7 @@ export function ProductosPage() {
 
   useEffect(() => {
     setPagina(1)
-  }, [busqueda, filtroCategoria, filtroEstado])
+  }, [busqueda, filtroCategoria, filtroEstado, filtroStockBajo])
 
   async function loadData() {
     setLoading(true)
@@ -351,9 +354,11 @@ export function ProductosPage() {
           filtroEstado === 'todos' ||
           (filtroEstado === 'activos' && p.activo) ||
           (filtroEstado === 'inactivos' && !p.activo)
-        return matchBusqueda && matchCategoria && matchEstado
+        const matchStockBajo =
+          !filtroStockBajo || (p.activo && stockBajo(Number(p.stock), Number(p.stock_minimo)))
+        return matchBusqueda && matchCategoria && matchEstado && matchStockBajo
       }),
-    [productos, busqueda, filtroCategoria, filtroEstado],
+    [productos, busqueda, filtroCategoria, filtroEstado, filtroStockBajo],
   )
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
@@ -497,6 +502,22 @@ export function ProductosPage() {
           </button>
         </div>
       </div>
+
+      {filtroStockBajo && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Mostrando productos con stock bajo o en el mínimo
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchParams({})}
+            className="font-medium text-amber-800 underline hover:text-amber-950"
+          >
+            Ver todos
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
