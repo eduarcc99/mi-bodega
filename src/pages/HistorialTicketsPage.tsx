@@ -8,6 +8,7 @@ import {
   Banknote,
   Smartphone,
   ShoppingBasket,
+  RotateCcw,
 } from 'lucide-react'
 import { formatMoney, todayLocalISO } from '@/lib/utils'
 import {
@@ -200,38 +201,93 @@ export function HistorialTicketsPage() {
             {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
             {!busqueda.trim() && ` · ${fecha}`}
           </p>
-          {tickets.map((t) => (
+          {tickets.map((t) => {
+            const dev =
+              t.tipo === 'venta'
+                ? t.devolucion
+                : { tiene_devolucion: false, devolucion_completa: false, total_devuelto: 0 }
+            const devCompleta = dev.devolucion_completa
+            const devParcial = dev.tiene_devolucion && !dev.devolucion_completa
+
+            return (
             <button
               key={`${t.tipo}-${t.id}`}
               type="button"
               onClick={() => abrirTicket(t)}
               disabled={cargandoDetalle}
-              className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-teal-300 hover:bg-teal-50/50 disabled:opacity-50"
+              className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left shadow-sm transition disabled:opacity-50 ${
+                devCompleta
+                  ? 'border-red-200 bg-red-50/60 hover:border-red-300'
+                  : devParcial
+                    ? 'border-amber-200 bg-amber-50/60 hover:border-amber-300'
+                    : t.tipo === 'consumo'
+                      ? 'border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50/50'
+                      : 'border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/50'
+              }`}
             >
               <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                  t.tipo === 'consumo' ? 'bg-orange-50' : 'bg-teal-50'
+                  devCompleta
+                    ? 'bg-red-100'
+                    : devParcial
+                      ? 'bg-amber-100'
+                      : t.tipo === 'consumo'
+                        ? 'bg-orange-50'
+                        : 'bg-teal-50'
                 }`}
               >
-                {t.tipo === 'consumo' ? (
+                {dev.tiene_devolucion && t.tipo === 'venta' ? (
+                  <RotateCcw
+                    className={`h-5 w-5 ${devCompleta ? 'text-red-700' : 'text-amber-700'}`}
+                  />
+                ) : t.tipo === 'consumo' ? (
                   <ShoppingBasket className="h-5 w-5 text-orange-700" />
                 ) : (
                   <Receipt className="h-5 w-5 text-teal-700" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-slate-900">
-                  {t.tipo === 'consumo' ? 'Consumo' : 'Venta'} {codigoTicket(t.id)}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p
+                    className={`font-semibold ${
+                      devCompleta ? 'text-red-900 line-through decoration-red-400' : 'text-slate-900'
+                    }`}
+                  >
+                    {t.tipo === 'consumo' ? 'Consumo' : 'Venta'} {codigoTicket(t.id)}
+                  </p>
+                  {devCompleta && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                      Devuelto
+                    </span>
+                  )}
+                  {devParcial && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                      Dev. parcial
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500">
                   {new Date(t.fecha).toLocaleString('es-PE')} ·{' '}
                   {t.tipo === 'consumo' ? t.registrado_por_nombre : t.cajero_nombre}
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-bold text-slate-900">
+                <p
+                  className={`font-bold ${
+                    devCompleta
+                      ? 'text-red-700 line-through decoration-red-300'
+                      : devParcial
+                        ? 'text-amber-900'
+                        : 'text-slate-900'
+                  }`}
+                >
                   {formatMoney(t.tipo === 'consumo' ? t.total_costo : t.total)}
                 </p>
+                {devParcial && t.tipo === 'venta' && (
+                  <p className="text-xs font-medium text-red-600">
+                    −{formatMoney(dev.total_devuelto)} dev.
+                  </p>
+                )}
                 {t.tipo === 'venta' ? (
                   <p className="flex items-center justify-end gap-1 text-xs text-slate-500">
                     {metodoIcon(t.metodo_pago)}
@@ -243,7 +299,7 @@ export function HistorialTicketsPage() {
               </div>
               <Eye className="h-4 w-4 shrink-0 text-slate-400" />
             </button>
-          ))}
+          )})}
         </div>
       )}
 
@@ -259,6 +315,7 @@ export function HistorialTicketsPage() {
           cajeroNombre={detalleVenta.cajero_nombre}
           onClose={() => setDetalleVenta(null)}
           historial
+          devolucion={detalleVenta.devolucion}
         />
       )}
 

@@ -383,6 +383,7 @@ export function ReportesPage() {
           cajeroNombre={ticketDetalle.cajero_nombre}
           onClose={() => setTicketDetalle(null)}
           historial
+          devolucion={ticketDetalle.devolucion}
         />
       )}
     </div>
