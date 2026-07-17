@@ -8,6 +8,8 @@ import { ProductosPage } from '@/pages/ProductosPage'
 import { PosPage } from '@/pages/PosPage'
 import { CierreCajaPage } from '@/pages/CierreCajaPage'
 import { ComprasPage } from '@/pages/ComprasPage'
+import { DeudasProveedorPage } from '@/pages/DeudasProveedorPage'
+import { LotesPage } from '@/pages/LotesPage'
 import { DevolucionesPage } from '@/pages/DevolucionesPage'
 import { ReportesPage } from '@/pages/ReportesPage'
 import { PedidosWebPage } from '@/pages/PedidosWebPage'
@@ -56,6 +58,8 @@ export default function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/productos" element={<ProductosPage />} />
                 <Route path="/compras" element={<ComprasPage />} />
+                <Route path="/deudas-proveedor" element={<DeudasProveedorPage />} />
+                <Route path="/lotes" element={<LotesPage />} />
                 <Route path="/reportes" element={<ReportesPage />} />
               </Route>
             </Route>

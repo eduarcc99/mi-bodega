@@ -16,6 +16,8 @@ import {
   Receipt,
   ChevronDown,
   MoreHorizontal,
+  Clock,
+  Layers,
 } from "lucide-react";
 import { useEffect, useState, type ComponentType } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,6 +38,8 @@ const adminPrimaryLinks: NavItem[] = [
 const adminMoreLinks: NavItem[] = [
   { to: "/consumo", label: "Consumo propio", icon: ShoppingBasket },
   { to: "/compras", label: "Compras", icon: Truck },
+  { to: "/lotes", label: "Lotes / vencimientos", icon: Layers },
+  { to: "/deudas-proveedor", label: "Deudas proveedor", icon: Clock },
   { to: "/tickets", label: "Tickets", icon: Receipt },
   { to: "/devoluciones", label: "Devoluciones", icon: RotateCcw },
   { to: "/reportes", label: "Reportes", icon: FileText },

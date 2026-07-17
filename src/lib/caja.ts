@@ -18,6 +18,7 @@ export interface GastoCaja {
   descripcion: string
   categoria: string
   afecta_efectivo: boolean
+  compra_id?: string | null
   created_at: string
 }
 
@@ -47,6 +48,7 @@ export interface ResumenCajaDia {
   ventasOtros: number
   totalVentas: number
   totalGastos: number
+  comprasYape: number
   totalDevoluciones: number
   devolucionesYape: number
   yapeEsperado: number
@@ -202,6 +204,10 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
     .filter((g) => g.afecta_efectivo)
     .reduce((s, g) => s + Number(g.monto), 0)
 
+  const comprasYape = gastos
+    .filter((g) => g.compra_id && !g.afecta_efectivo)
+    .reduce((s, g) => s + Number(g.monto), 0)
+
   let devolucionesEfectivo = 0
   let devolucionesYape = 0
   for (const d of devoluciones) {
@@ -210,7 +216,8 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
   }
   const totalDevoluciones = devoluciones.reduce((s, d) => s + Number(d.total), 0)
 
-  const yapeEsperado = Math.round((ventasYape - devolucionesYape) * 100) / 100
+  const yapeEsperado =
+    Math.round((ventasYape - devolucionesYape - comprasYape) * 100) / 100
 
   // Prioridad: apertura del día → cierre anterior → 0
   let efectivoInicial = 0
@@ -297,6 +304,7 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
     ventasOtros,
     totalVentas: ventasEfectivo + ventasYape + ventasOtros,
     totalGastos,
+    comprasYape: Math.round(comprasYape * 100) / 100,
     totalDevoluciones,
     devolucionesYape,
     yapeEsperado,
@@ -438,6 +446,9 @@ export function exportarCierrePDF(params: {
     ['Ventas Yape', formatMoney(resumen.ventasYape)],
     ['Ventas otro', formatMoney(resumen.ventasOtros)],
     ['Gastos efectivo', formatMoney(resumen.totalGastos)],
+    ...(resumen.comprasYape > 0
+      ? [['Compras pagadas con Yape', formatMoney(resumen.comprasYape)] as [string, string]]
+      : []),
     ['Efectivo esperado', formatMoney(resumen.efectivoEsperado)],
     ['Efectivo contado', formatMoney(efectivoDeclarado)],
     ['Diferencia efectivo', formatMoney(diferencia)],

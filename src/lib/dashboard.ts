@@ -449,24 +449,34 @@ export interface VencimientoResumen {
 
 export async function fetchMapaVencimientos(): Promise<VencimientoResumen[]> {
   const { data } = await supabase
-    .from('productos')
-    .select('nombre, stock, costo, fecha_vencimiento')
-    .eq('activo', true)
+    .from('producto_lotes')
+    .select('cantidad, fecha_vencimiento, productos(nombre, costo, activo)')
+    .gt('cantidad', 0)
     .not('fecha_vencimiento', 'is', null)
     .order('fecha_vencimiento')
 
   if (!data) return []
 
-  return (data as Producto[])
-    .map((p) => {
-      const dias = diasHastaVencimiento(p.fecha_vencimiento)
-      const vencido = productoVencido(p.fecha_vencimiento)
+  return data
+    .map((row) => {
+      const p = row.productos as unknown as {
+        nombre: string
+        costo: number
+        activo: boolean
+      } | null
+      if (!p?.activo) return null
+
+      const dias = diasHastaVencimiento(row.fecha_vencimiento as string)
+      const vencido = productoVencido(row.fecha_vencimiento as string)
       if (!vencido && (dias === null || dias > 15)) return null
 
+      const cantidad = Number(row.cantidad)
+      const costo = Number(p.costo)
+
       return {
-        nombre: p.nombre,
-        cantidad: Number(p.stock),
-        valorPerdida: Math.round(Number(p.stock) * Number(p.costo) * 100) / 100,
+        nombre: `${p.nombre} (${cantidad} ud)`,
+        cantidad,
+        valorPerdida: Math.round(cantidad * costo * 100) / 100,
         dias,
         estado: vencido ? ('vencido' as const) : ('por_vencer' as const),
       }

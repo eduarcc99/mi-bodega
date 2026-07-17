@@ -111,6 +111,7 @@ export function CierreCajaPage() {
   const ventasYape = resumen?.ventasYape ?? 0
   const ventasOtros = resumen?.ventasOtros ?? 0
   const totalGastos = resumen?.totalGastos ?? 0
+  const comprasYape = resumen?.comprasYape ?? 0
   const devolucionesEfectivo =
     resumen?.movimientos
       .filter((m) => m.tipo === 'devolucion' && m.afectaCaja)
@@ -132,7 +133,7 @@ export function CierreCajaPage() {
   const yapeContado = parseFloat(yapeDeclarado) || 0
   const diferencia = Math.round((declarado - efectivoEsperado) * 100) / 100
   const diferenciaYape = Math.round((yapeContado - yapeEsperado) * 100) / 100
-  const requiereYape = yapeEsperado > 0
+  const requiereYape = ventasYape > 0 || comprasYape > 0 || devolucionesYape > 0
   const hayDiferencia =
     Math.abs(diferencia) >= UMBRAL_DIFERENCIA ||
     (requiereYape && Math.abs(diferenciaYape) >= UMBRAL_DIFERENCIA)
@@ -373,6 +374,9 @@ export function CierreCajaPage() {
               <ResumenLinea label="Ventas otro método" value={formatMoney(ventasOtros)} />
             )}
             <ResumenLinea label="Gastos" value={formatMoney(totalGastos)} negativo />
+            {comprasYape > 0 && (
+              <ResumenLinea label="Compras pagadas con Yape" value={formatMoney(comprasYape)} negativo />
+            )}
             <div className="border-t border-slate-200 pt-2" />
             <ResumenLinea
               label="Efectivo contado"
@@ -517,20 +521,30 @@ export function CierreCajaPage() {
                 valor={efectivoEsperado}
                 destacado
               />
-              {(ventasYape > 0 || devolucionesYape > 0) && (
+              {(ventasYape > 0 || devolucionesYape > 0 || comprasYape > 0) && (
                 <>
                   <div className="my-2 border-t border-teal-300" />
-                  <FilaCalculo
-                    icon={<Smartphone className="h-4 w-4 text-purple-600" />}
-                    label="Ventas Yape"
-                    valor={ventasYape}
-                    positivo
-                  />
+                  {ventasYape > 0 && (
+                    <FilaCalculo
+                      icon={<Smartphone className="h-4 w-4 text-purple-600" />}
+                      label="Ventas Yape"
+                      valor={ventasYape}
+                      positivo
+                    />
+                  )}
                   {devolucionesYape > 0 && (
                     <FilaCalculo
                       icon={<Minus className="h-4 w-4 text-orange-500" />}
                       label="Devoluciones Yape"
                       valor={devolucionesYape}
+                      negativo
+                    />
+                  )}
+                  {comprasYape > 0 && (
+                    <FilaCalculo
+                      icon={<Minus className="h-4 w-4 text-purple-500" />}
+                      label="Compras pagadas con Yape"
+                      valor={comprasYape}
                       negativo
                     />
                   )}
@@ -558,7 +572,7 @@ export function CierreCajaPage() {
               </button>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Ej: compraste pollo S/ 20 — anótalo para que cuadre la caja
+              Las compras en efectivo o Yape se anotan solas · aquí van otros gastos (pollo, delivery…)
             </p>
             {resumen.gastos.length === 0 ? (
               <p className="mt-4 text-sm text-slate-400">No hay gastos registrados</p>
@@ -570,6 +584,8 @@ export function CierreCajaPage() {
                       <p className="text-sm font-medium text-slate-800">{g.descripcion}</p>
                       <p className="text-xs text-slate-400">
                         {CATEGORIAS_GASTO.find((c) => c.id === g.categoria)?.label ?? g.categoria}
+                        {g.compra_id && ' · desde Compras'}
+                        {!g.afecta_efectivo && ' · Yape'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
