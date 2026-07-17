@@ -10,7 +10,6 @@ import {
   AlertCircle,
   Scale,
   CheckCircle2,
-  Info,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { buscarProductosParaVenta } from '@/lib/ventas'
@@ -244,14 +243,6 @@ export function ConsumoPage() {
         <h1 className="text-2xl font-bold text-slate-900">Consumo propio</h1>
         <p className="text-slate-500">
           Retiro de mercadería al costo · no entra a caja ni a ventas · Cajero: {perfil?.nombre}
-        </p>
-      </div>
-
-      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <p>
-          Baja el stock y registra cuánto costó la mercadería. <strong>No afecta el efectivo</strong> del
-          cierre de caja. También verás cuánto dejó de ganar la tienda (precio de venta − costo).
         </p>
       </div>
 
