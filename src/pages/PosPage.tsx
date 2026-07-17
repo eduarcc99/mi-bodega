@@ -31,7 +31,7 @@ import {
   saveCartToStorage,
   clearCartStorage,
 } from '@/lib/pos'
-import { buscarProductos, completarVenta, validateProductoParaVenta } from '@/lib/ventas'
+import { buscarProductosParaVenta, completarVenta, validateStockLotesParaVenta } from '@/lib/ventas'
 import { formatMoney } from '@/lib/utils'
 import type { MetodoPago, Producto } from '@/types/database'
 import { VentaTicket } from '@/components/pos/VentaTicket'
@@ -129,7 +129,7 @@ export function PosPage() {
       .reduce((s, i) => s + stockNecesario(i), 0)
   }
 
-  function confirmarAgregarModal() {
+  async function confirmarAgregarModal() {
     if (!modalAgregar) return
     const { producto, modo, cantidad: cantStr } = modalAgregar
     const cantidad = parseFloat(cantStr)
@@ -142,7 +142,7 @@ export function PosPage() {
     const stockReq = stockNecesario(itemPreview)
     const stockUsado = stockEnCarrito(producto.id, modo)
 
-    const validationError = validateProductoParaVenta(producto, stockReq + stockUsado)
+    const validationError = await validateStockLotesParaVenta(producto, stockReq + stockUsado)
     if (validationError) {
       setError(validationError)
       return
@@ -168,7 +168,7 @@ export function PosPage() {
     setError('')
     setAvisoBusqueda('')
 
-    const productos = await buscarProductos(q)
+    const productos = await buscarProductosParaVenta(q)
 
     const exactos = productos.filter((p) => p.nombre.toLowerCase() === q.toLowerCase())
     const unico = exactos.length === 1 ? exactos[0] : productos.length === 1 ? productos[0] : null
@@ -202,8 +202,8 @@ export function PosPage() {
     focusSearch()
   }
 
-  function addProductoDirecto(producto: Producto) {
-    const validationError = validateProductoParaVenta(producto)
+  async function addProductoDirecto(producto: Producto) {
+    const validationError = await validateStockLotesParaVenta(producto)
     if (validationError) {
       setError(validationError)
       return

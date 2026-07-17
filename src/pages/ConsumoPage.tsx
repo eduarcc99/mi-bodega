@@ -13,7 +13,7 @@ import {
   Info,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { buscarProductos } from '@/lib/ventas'
+import { buscarProductosParaVenta } from '@/lib/ventas'
 import { formatMoney } from '@/lib/utils'
 import type { Producto } from '@/types/database'
 import {
@@ -30,7 +30,7 @@ import {
   totalCosto,
   totalVentaPotencial,
   oportunidadPerdida,
-  validateProductoParaConsumo,
+  validateStockLotesParaConsumo,
   esVentaPorPeso,
   permiteVentaUnidadSuelta,
   completarConsumo,
@@ -96,7 +96,7 @@ export function ConsumoPage() {
       .reduce((s, i) => s + stockNecesario(i), 0)
   }
 
-  function confirmarAgregarModal() {
+  async function confirmarAgregarModal() {
     if (!modalAgregar) return
     const { producto, modo, cantidad: cantStr } = modalAgregar
     const cantidad = parseFloat(cantStr)
@@ -109,7 +109,7 @@ export function ConsumoPage() {
     const stockReq = stockNecesario(itemPreview)
     const stockUsado = stockEnCarrito(producto.id, modo)
 
-    const validationError = validateProductoParaConsumo(producto, stockReq + stockUsado)
+    const validationError = await validateStockLotesParaConsumo(producto, stockReq + stockUsado)
     if (validationError) {
       setError(validationError)
       return
@@ -130,7 +130,7 @@ export function ConsumoPage() {
     setError('')
     setAvisoBusqueda('')
 
-    const productos = await buscarProductos(q)
+    const productos = await buscarProductosParaVenta(q)
     const exactos = productos.filter((p) => p.nombre.toLowerCase() === q.toLowerCase())
     const unico = exactos.length === 1 ? exactos[0] : productos.length === 1 ? productos[0] : null
 
@@ -151,8 +151,8 @@ export function ConsumoPage() {
     setAvisoBusqueda(`No encontramos "${q}" en el catálogo.`)
   }
 
-  function addProductoDirecto(producto: Producto) {
-    const validationError = validateProductoParaConsumo(producto)
+  async function addProductoDirecto(producto: Producto) {
+    const validationError = await validateStockLotesParaConsumo(producto)
     if (validationError) {
       setError(validationError)
       return

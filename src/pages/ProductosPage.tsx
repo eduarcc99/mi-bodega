@@ -33,6 +33,7 @@ import {
 } from '@/lib/utils'
 import type { Categoria, Producto, ProductoForm, UnidadMedida } from '@/types/database'
 import { useAuth } from '@/contexts/AuthContext'
+import { fijarStockManual } from '@/lib/lotes'
 
 const CameraScannerModal = lazy(() =>
   import('@/components/pos/CameraScannerModal').then((m) => ({ default: m.CameraScannerModal })),
@@ -328,13 +329,38 @@ export function ProductosPage() {
       updated_at: new Date().toISOString(),
     }
 
-    const { error: saveError } = editId
-      ? await supabase.from('productos').update(payload).eq('id', editId)
-      : await supabase.from('productos').insert(payload)
+    let productoId = editId ?? null
+    let saveOk = false
 
-    if (saveError) {
-      setError(saveError.message)
+    if (editId) {
+      const { error: saveError } = await supabase.from('productos').update(payload).eq('id', editId)
+      if (saveError) {
+        setError(saveError.message)
+      } else {
+        saveOk = true
+      }
     } else {
+      const { data, error: saveError } = await supabase
+        .from('productos')
+        .insert(payload)
+        .select('id')
+        .single()
+      if (saveError) {
+        setError(saveError.message)
+      } else {
+        productoId = data?.id ?? null
+        saveOk = true
+      }
+    }
+
+    if (saveOk && productoId) {
+      try {
+        await fijarStockManual(productoId)
+      } catch (syncErr) {
+        setError(syncErr instanceof Error ? syncErr.message : 'Error al sincronizar lotes')
+        setSaving(false)
+        return
+      }
       setModalOpen(false)
       loadData()
     }

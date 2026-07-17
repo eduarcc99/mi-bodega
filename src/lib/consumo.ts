@@ -11,6 +11,8 @@ import {
   updateCartItemQuantity,
   stockNecesario,
 } from '@/lib/pos'
+import { ensureLotesFromProducto } from '@/lib/lotes'
+import { validateStockLotesParaVenta } from '@/lib/ventas'
 import type { Producto } from '@/types/database'
 import { localDayRangeISO, productoVencido, todayLocalISO } from '@/lib/utils'
 
@@ -99,6 +101,13 @@ export function productoToConsumoItem(
   }
 }
 
+export async function validateStockLotesParaConsumo(
+  producto: Producto,
+  stockNecesarioQty = 0.001,
+): Promise<string | null> {
+  return validateStockLotesParaVenta(producto, stockNecesarioQty)
+}
+
 export async function completarConsumo(params: {
   items: CartItem[]
   registrado_por: string
@@ -111,6 +120,12 @@ export async function completarConsumo(params: {
   const catalogados = items.filter((i) => i.producto_id)
   if (catalogados.length === 0) {
     throw new Error('El consumo propio solo admite productos del catálogo')
+  }
+
+  for (const item of catalogados) {
+    if (item.producto_id) {
+      await ensureLotesFromProducto(item.producto_id)
+    }
   }
 
   const total_costo = totalCosto(catalogados)
