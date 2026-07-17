@@ -97,6 +97,36 @@ export function compraTotal(lineas: LineaCompra[]): number {
   return lineas.reduce((s, l) => s + lineaSubtotal(l), 0)
 }
 
+export function lineaCompraFromProducto(p: Producto): LineaCompra {
+  return {
+    key: crypto.randomUUID(),
+    producto_id: p.id,
+    nombre: p.nombre,
+    unidad: p.unidad,
+    cantidad: 1,
+    costo_unitario: Number(p.costo) || 0,
+    fecha_vencimiento_lote: '',
+    vencimiento_actual: p.fecha_vencimiento ?? null,
+  }
+}
+
+/** Último agregado primero; fusiona solo mismo producto y mismo vencimiento de lote. */
+export function mergeLineaCompra(lineas: LineaCompra[], nueva: LineaCompra): LineaCompra[] {
+  const idx = lineas.findIndex(
+    (l) =>
+      l.producto_id === nueva.producto_id &&
+      (l.fecha_vencimiento_lote || '') === (nueva.fecha_vencimiento_lote || ''),
+  )
+  if (idx >= 0) {
+    const merged: LineaCompra = {
+      ...lineas[idx],
+      cantidad: lineas[idx].cantidad + nueva.cantidad,
+    }
+    return [merged, ...lineas.filter((_, i) => i !== idx)]
+  }
+  return [nueva, ...lineas]
+}
+
 export function validarCuotas(saldo: number, cuotas: CuotaInput[]): string | null {
   if (saldo <= 0) return null
   if (cuotas.length === 0) return 'Agrega al menos una cuota con fecha de pago'

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   Truck,
   Plus,
@@ -28,6 +28,8 @@ import {
   MODOS_PAGO_COMPRA,
   labelModoPagoCompra,
   validarCuotas,
+  lineaCompraFromProducto,
+  mergeLineaCompra,
   type LineaCompra,
   type CompraRegistrada,
   type ModoPagoCompra,
@@ -81,6 +83,19 @@ export function ComprasPage() {
 
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<Producto[]>([])
+  const [flashAgregado, setFlashAgregado] = useState('')
+
+  const focusSearch = useCallback(() => {
+    setTimeout(() => {
+      searchRef.current?.focus({ preventScroll: true })
+    }, 120)
+  }, [])
+
+  useEffect(() => {
+    if (!flashAgregado) return
+    const t = setTimeout(() => setFlashAgregado(''), 1200)
+    return () => clearTimeout(t)
+  }, [flashAgregado])
 
   async function load() {
     setLoading(true)
@@ -126,41 +141,28 @@ export function ComprasPage() {
     const query = (q ?? busqueda).trim()
     if (!query) return
     const prods = await buscarProductosCompra(query)
-    if (prods.length === 1) {
-      agregarProducto(prods[0])
-      setBusqueda('')
-      setResultados([])
-    } else {
-      setResultados(prods)
+    const exactos = prods.filter((p) => p.nombre.toLowerCase() === query.toLowerCase())
+    const unico = exactos.length === 1 ? exactos[0] : prods.length === 1 ? prods[0] : null
+
+    if (unico) {
+      agregarProducto(unico)
+      return
     }
+
+    setResultados(prods)
   }
 
   function agregarProducto(p: Producto) {
-    const existe = lineas.find((l) => l.producto_id === p.id)
-    if (existe) {
-      setLineas((prev) =>
-        prev.map((l) =>
-          l.producto_id === p.id ? { ...l, cantidad: l.cantidad + 1 } : l,
-        ),
-      )
-    } else {
-      setLineas((prev) => [
-        ...prev,
-        {
-          key: p.id,
-          producto_id: p.id,
-          nombre: p.nombre,
-          unidad: p.unidad,
-          cantidad: 1,
-          costo_unitario: Number(p.costo) || 0,
-          fecha_vencimiento_lote: '',
-          vencimiento_actual: p.fecha_vencimiento ?? null,
-        },
-      ])
-    }
+    const nueva = lineaCompraFromProducto(p)
+    setLineas((prev) => mergeLineaCompra(prev, nueva))
+    setFlashAgregado(p.nombre)
     setBusqueda('')
     setResultados([])
-    searchRef.current?.focus()
+    focusSearch()
+  }
+
+  function seleccionarResultado(p: Producto) {
+    agregarProducto(p)
   }
 
   function updateLinea(
@@ -247,6 +249,7 @@ export function ComprasPage() {
     setLineas([])
     setBusqueda('')
     setResultados([])
+    setFlashAgregado('')
     setError('')
   }
 
@@ -452,10 +455,13 @@ export function ComprasPage() {
             <p className="mb-2 text-xs text-slate-500">
               Busca y agrega todos los productos del proveedor antes de guardar
             </p>
-            <div className="relative">
+            <div className="relative z-10">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
                 ref={searchRef}
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
                 value={busqueda}
                 onChange={(e) => {
                   setBusqueda(e.target.value)
@@ -465,20 +471,30 @@ export function ComprasPage() {
                 placeholder="Buscar producto por nombre o código…"
                 className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-teal-500"
               />
+              {resultados.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                  {resultados.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onPointerDown={(e) => {
+                        e.preventDefault()
+                        seleccionarResultado(p)
+                      }}
+                      className="flex w-full touch-manipulation items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-teal-50 active:bg-teal-100"
+                    >
+                      <span className="text-sm font-medium">{p.nombre}</span>
+                      <span className="text-xs text-slate-500">Costo actual: {formatMoney(p.costo)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {resultados.length > 0 && (
-              <div className="mt-2 rounded-lg border border-slate-200 bg-white shadow-sm">
-                {resultados.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => agregarProducto(p)}
-                    className="flex w-full items-center justify-between border-b border-slate-100 px-4 py-2 text-left last:border-0 hover:bg-teal-50"
-                  >
-                    <span className="text-sm font-medium">{p.nombre}</span>
-                    <span className="text-xs text-slate-500">Costo actual: {formatMoney(p.costo)}</span>
-                  </button>
-                ))}
-              </div>
+            {flashAgregado && (
+              <p className="mt-2 rounded-lg bg-teal-50 px-3 py-2 text-center text-sm font-medium text-teal-800">
+                ✓ {flashAgregado} agregado
+              </p>
             )}
           </div>
 
@@ -488,7 +504,86 @@ export function ComprasPage() {
               <p className="text-sm">Busca y agrega productos a esta compra</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <>
+              <p className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500 md:hidden">
+                Indica cuándo vence <strong>este lote</strong>. Cada fecha crea un lote aparte.
+              </p>
+              <div className="space-y-3 md:hidden">
+                {lineas.map((l) => (
+                  <div key={l.key} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-slate-900">{l.nombre}</p>
+                        {l.vencimiento_actual && (
+                          <p className="text-xs text-slate-400">
+                            Catálogo hoy: {formatDate(l.vencimiento_actual)}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeLinea(l.key)}
+                        className="shrink-0 text-red-400 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <label className="mb-1 block text-xs text-slate-500">Cantidad</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0.001"
+                            step="0.001"
+                            inputMode="decimal"
+                            value={l.cantidad}
+                            onChange={(e) =>
+                              updateLinea(l.key, 'cantidad', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-full rounded border border-slate-300 px-2 py-2"
+                          />
+                          <span className="text-xs text-slate-400">{l.unidad}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-slate-500">Costo unit.</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          inputMode="decimal"
+                          value={l.costo_unitario}
+                          onChange={(e) =>
+                            updateLinea(l.key, 'costo_unitario', parseFloat(e.target.value) || 0)
+                          }
+                          className="w-full rounded border border-slate-300 px-2 py-2"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="mb-1 block text-xs text-slate-500">Vence lote</label>
+                        <input
+                          type="date"
+                          value={l.fecha_vencimiento_lote ?? ''}
+                          onChange={(e) =>
+                            updateLinea(l.key, 'fecha_vencimiento_lote', e.target.value)
+                          }
+                          className="w-full rounded border border-slate-300 px-2 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-right text-sm font-medium text-teal-700">
+                      Subtotal: {formatMoney(lineaSubtotal(l))}
+                    </p>
+                  </div>
+                ))}
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                  <span className="font-semibold text-slate-700">Total compra: </span>
+                  <span className="font-bold text-teal-700">{formatMoney(total)}</span>
+                </div>
+              </div>
+
+              <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
               <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-500">
                 Indica cuándo vence <strong>este lote</strong>. Cada fecha crea un lote aparte
                 (ej: 3 leches al 20/07 y 6 al 05/08). Al vender se descuenta primero el que
@@ -566,7 +661,8 @@ export function ComprasPage() {
                   </tr>
                 </tfoot>
               </table>
-            </div>
+              </div>
+            </>
           )}
 
           <div className="mt-6">
