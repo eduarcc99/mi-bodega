@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import {
   Truck,
   Plus,
@@ -57,6 +57,17 @@ function nuevaCuota(monto: number, descripcion: string): CuotaForm {
   }
 }
 
+function agruparComprasPorFecha(compras: CompraRegistrada[]): [string, CompraRegistrada[]][] {
+  const map = new Map<string, CompraRegistrada[]>()
+  for (const c of compras) {
+    const fecha = c.fecha.slice(0, 10)
+    const lista = map.get(fecha) ?? []
+    lista.push(c)
+    map.set(fecha, lista)
+  }
+  return [...map.entries()].sort(([a], [b]) => b.localeCompare(a))
+}
+
 export function ComprasPage() {
   const { perfil } = useAuth()
   const searchRef = useRef<HTMLInputElement>(null)
@@ -69,6 +80,24 @@ export function ComprasPage() {
   const [mensaje, setMensaje] = useState('')
   const [expandida, setExpandida] = useState<string | null>(null)
   const [cuotasExpandida, setCuotasExpandida] = useState<CuotaProveedor[]>([])
+  const [fechasAbiertas, setFechasAbiertas] = useState<Set<string>>(new Set())
+
+  const comprasPorFecha = useMemo(() => agruparComprasPorFecha(compras), [compras])
+
+  useEffect(() => {
+    if (comprasPorFecha.length > 0 && fechasAbiertas.size === 0) {
+      setFechasAbiertas(new Set([comprasPorFecha[0][0]]))
+    }
+  }, [comprasPorFecha, fechasAbiertas.size])
+
+  function toggleFecha(fecha: string) {
+    setFechasAbiertas((prev) => {
+      const next = new Set(prev)
+      if (next.has(fecha)) next.delete(fecha)
+      else next.add(fecha)
+      return next
+    })
+  }
 
   const [fecha, setFecha] = useState(todayLocalISO())
   const [proveedor, setProveedor] = useState('')
@@ -844,83 +873,117 @@ export function ComprasPage() {
         ) : compras.length === 0 ? (
           <p className="py-12 text-center text-sm text-slate-400">No hay compras registradas</p>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {compras.map((c) => (
-              <div key={c.id}>
-                <button
-                  onClick={() => toggleExpandida(c.id)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="font-medium text-slate-900">
-                      {c.proveedor_nombre ?? 'Sin proveedor'}
-                      {c.estado_pago && c.estado_pago !== 'pagado' && (
-                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                          Pendiente {formatMoney(Number(c.monto_pendiente ?? 0))}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatDate(c.fecha)}
-                      {c.numero_factura && ` · Factura ${c.numero_factura}`}
-                      {` · ${c.compra_detalles?.length ?? 0} productos`}
-                      {c.estado_pago === 'pagado'
-                        ? ' · Pagado'
-                        : c.estado_pago === 'parcial'
-                          ? ` · Parcial (${formatMoney(Number(c.monto_pagado ?? 0))} pagado)`
-                          : c.estado_pago === 'pendiente'
-                            ? ' · Fiado'
-                            : ''}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-teal-700">{formatMoney(Number(c.total))}</span>
-                    {expandida === c.id ? (
-                      <ChevronUp className="h-4 w-4 text-slate-400" />
+          <div>
+            {comprasPorFecha.map(([fecha, delDia]) => {
+              const abierta = fechasAbiertas.has(fecha)
+              const totalDia = delDia.reduce((s, c) => s + Number(c.total), 0)
+              return (
+                <div key={fecha} className="border-b border-slate-100 last:border-0">
+                  <button
+                    type="button"
+                    onClick={() => toggleFecha(fecha)}
+                    className="flex w-full items-center justify-between bg-slate-50 px-5 py-3 text-left hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">
+                        {formatDate(fecha)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {delDia.length} compra{delDia.length === 1 ? '' : 's'} ·{' '}
+                        {formatMoney(totalDia)}
+                      </p>
+                    </div>
+                    {abierta ? (
+                      <ChevronUp className="h-5 w-5 text-slate-400" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-slate-400" />
+                      <ChevronDown className="h-5 w-5 text-slate-400" />
                     )}
-                  </div>
-                </button>
-                {expandida === c.id && (
-                  <div className="border-t border-slate-100 bg-slate-50 px-5 py-3">
-                    <ul className="space-y-1 text-sm">
-                      {c.compra_detalles?.map((d) => (
-                        <li key={d.id} className="flex justify-between gap-2 text-slate-700">
-                          <span>
-                            {d.productos?.nombre ?? 'Producto'} — {d.cantidad}{' '}
-                            {d.productos?.unidad ?? 'und'}
-                            {d.fecha_vencimiento_lote &&
-                              ` · lote vence ${formatDate(d.fecha_vencimiento_lote)}`}
-                          </span>
-                          <span>
-                            {formatMoney(Number(d.costo_unitario))} c/u ={' '}
-                            {formatMoney(Number(d.cantidad) * Number(d.costo_unitario))}
-                          </span>
-                        </li>
+                  </button>
+                  {abierta && (
+                    <div className="divide-y divide-slate-100">
+                      {delDia.map((c) => (
+                        <div key={c.id}>
+                          <button
+                            onClick={() => toggleExpandida(c.id)}
+                            className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                          >
+                            <div>
+                              <p className="font-medium text-slate-900 dark:text-slate-100">
+                                {c.proveedor_nombre ?? 'Sin proveedor'}
+                                {c.estado_pago && c.estado_pago !== 'pagado' && (
+                                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                    Pendiente {formatMoney(Number(c.monto_pendiente ?? 0))}
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {c.numero_factura && `Factura ${c.numero_factura} · `}
+                                {c.compra_detalles?.length ?? 0} productos
+                                {c.estado_pago === 'pagado'
+                                  ? ' · Pagado'
+                                  : c.estado_pago === 'parcial'
+                                    ? ` · Parcial (${formatMoney(Number(c.monto_pagado ?? 0))} pagado)`
+                                    : c.estado_pago === 'pendiente'
+                                      ? ' · Fiado'
+                                      : ''}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-teal-700 dark:text-teal-400">
+                                {formatMoney(Number(c.total))}
+                              </span>
+                              {expandida === c.id ? (
+                                <ChevronUp className="h-4 w-4 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-slate-400" />
+                              )}
+                            </div>
+                          </button>
+                          {expandida === c.id && (
+                            <div className="border-t border-slate-100 bg-slate-50 px-5 py-3 dark:border-slate-700 dark:bg-slate-800/30">
+                              <ul className="space-y-1 text-sm">
+                                {c.compra_detalles?.map((d) => (
+                                  <li key={d.id} className="flex justify-between gap-2 text-slate-700 dark:text-slate-300">
+                                    <span>
+                                      {d.productos?.nombre ?? 'Producto'} — {d.cantidad}{' '}
+                                      {d.productos?.unidad ?? 'und'}
+                                      {d.fecha_vencimiento_lote &&
+                                        ` · lote vence ${formatDate(d.fecha_vencimiento_lote)}`}
+                                    </span>
+                                    <span>
+                                      {formatMoney(Number(d.costo_unitario))} c/u ={' '}
+                                      {formatMoney(Number(d.cantidad) * Number(d.costo_unitario))}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                              {cuotasExpandida.length > 0 && (
+                                <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-600">
+                                  <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Cuotas</p>
+                                  <ul className="space-y-1 text-sm">
+                                    {cuotasExpandida.map((q) => (
+                                      <li key={q.id} className="flex justify-between text-slate-700 dark:text-slate-300">
+                                        <span>
+                                          {q.descripcion || 'Cuota'} · vence {formatDate(q.fecha_vencimiento)}
+                                        </span>
+                                        <span className={q.pagado ? 'text-emerald-600' : 'text-amber-700'}>
+                                          {formatMoney(Number(q.monto))}{' '}
+                                          {q.pagado ? '✓ pagada' : 'pendiente'}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </ul>
-                    {cuotasExpandida.length > 0 && (
-                      <div className="mt-3 border-t border-slate-200 pt-3">
-                        <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Cuotas</p>
-                        <ul className="space-y-1 text-sm">
-                          {cuotasExpandida.map((q) => (
-                            <li key={q.id} className="flex justify-between text-slate-700">
-                              <span>
-                                {q.descripcion || 'Cuota'} · vence {formatDate(q.fecha_vencimiento)}
-                              </span>
-                              <span className={q.pagado ? 'text-emerald-600' : 'text-amber-700'}>
-                                {formatMoney(Number(q.monto))} {q.pagado ? '✓ pagada' : 'pendiente'}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

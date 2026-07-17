@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Wallet,
   Plus,
@@ -20,10 +20,9 @@ import {
   Unlock,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { formatMoney, todayLocalISO } from '@/lib/utils'
+import { formatMoney, todayLocalISO, parseMonto } from '@/lib/utils'
 import {
   CATEGORIAS_GASTO,
-  DENOMINACIONES,
   UMBRAL_DIFERENCIA,
   fetchResumenCaja,
   registrarGasto,
@@ -31,9 +30,7 @@ import {
   cerrarCaja,
   abrirCaja,
   exportarCierrePDF,
-  totalDesdeConteos,
   type ResumenCajaDia,
-  type ConteosBilletes,
 } from '@/lib/caja'
 
 export function CierreCajaPage() {
@@ -50,8 +47,6 @@ export function CierreCajaPage() {
   const [yapeDeclarado, setYapeDeclarado] = useState('')
   const [motivoDiferencia, setMotivoDiferencia] = useState('')
   const [notas, setNotas] = useState('')
-  const [conteos, setConteos] = useState<ConteosBilletes>({})
-  const [usarContador, setUsarContador] = useState(true)
 
   const [cerrando, setCerrando] = useState(false)
   const [mensaje, setMensaje] = useState('')
@@ -84,7 +79,6 @@ export function CierreCajaPage() {
         setYapeDeclarado('')
         setMotivoDiferencia('')
         setNotas('')
-        setConteos({})
         setEditMode(false)
       }
 
@@ -121,26 +115,20 @@ export function CierreCajaPage() {
   const efectivoEsperado =
     Math.round((efectivoInicial + ventasEfectivo - totalGastos - devolucionesEfectivo) * 100) / 100
 
-  const totalContador = useMemo(() => totalDesdeConteos(conteos), [conteos])
-
-  useEffect(() => {
-    if (usarContador && !modoResumen && totalContador > 0) {
-      setEfectivoDeclarado(String(totalContador))
-    }
-  }, [totalContador, usarContador, modoResumen])
-
-  const declarado = parseFloat(efectivoDeclarado) || 0
-  const yapeContado = parseFloat(yapeDeclarado) || 0
+  const declarado = parseMonto(efectivoDeclarado)
+  const yapeContado = parseMonto(yapeDeclarado)
   const diferencia = Math.round((declarado - efectivoEsperado) * 100) / 100
   const diferenciaYape = Math.round((yapeContado - yapeEsperado) * 100) / 100
   const requiereYape = ventasYape > 0 || comprasYape > 0 || devolucionesYape > 0
-  const hayDiferencia =
-    Math.abs(diferencia) >= UMBRAL_DIFERENCIA ||
-    (requiereYape && Math.abs(diferenciaYape) >= UMBRAL_DIFERENCIA)
+  const difEfectivo = Math.abs(diferencia) >= UMBRAL_DIFERENCIA
+  const difYape = requiereYape && Math.abs(diferenciaYape) >= UMBRAL_DIFERENCIA
+  const hayDiferencia = difEfectivo || difYape
+  const motivoOk = motivoDiferencia.trim().length >= 3
+
   const puedeCerrar =
     declarado > 0 &&
     (!requiereYape || yapeDeclarado.trim() !== '') &&
-    (!hayDiferencia || motivoDiferencia.trim().length >= 3)
+    (!hayDiferencia || motivoOk)
 
   async function handleAbrirCaja() {
     if (!perfil) return
@@ -653,66 +641,22 @@ export function CierreCajaPage() {
           </div>
 
           {/* Cierre / conteo */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 pb-28 shadow-sm sm:pb-5">
             <h2 className="mb-4 font-semibold text-slate-900">Cerrar caja — conteo final</h2>
 
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-700">Contador de billetes y monedas</p>
-              <button
-                type="button"
-                onClick={() => setUsarContador((v) => !v)}
-                className="text-xs font-medium text-teal-700 underline"
-              >
-                {usarContador ? 'Ingresar total a mano' : 'Usar contador'}
-              </button>
+            <div className="mb-4">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                ¿Cuánto efectivo tienes en mano?
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={efectivoDeclarado}
+                onChange={(e) => setEfectivoDeclarado(e.target.value)}
+                placeholder="Ej: 107.00"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 text-lg font-semibold outline-none focus:border-teal-500"
+              />
             </div>
-
-            {usarContador ? (
-              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {DENOMINACIONES.map((d) => (
-                  <label
-                    key={d.valor}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                  >
-                    <span className="font-medium text-slate-700">{d.label}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={conteos[String(d.valor)] ?? ''}
-                      onChange={(e) => {
-                        const n = parseInt(e.target.value, 10)
-                        setConteos((prev) => ({
-                          ...prev,
-                          [String(d.valor)]: isNaN(n) || n < 0 ? 0 : n,
-                        }))
-                      }}
-                      className="w-16 rounded border border-slate-200 px-2 py-1 text-right outline-none focus:border-teal-500"
-                      placeholder="0"
-                    />
-                  </label>
-                ))}
-                <div className="col-span-2 flex items-center justify-between rounded-lg bg-teal-50 px-3 py-2 sm:col-span-3">
-                  <span className="text-sm font-medium text-teal-900">Total contado</span>
-                  <span className="text-lg font-bold text-teal-800">{formatMoney(totalContador)}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-4">
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  ¿Cuánto efectivo tienes en mano?
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={efectivoDeclarado}
-                  onChange={(e) => setEfectivoDeclarado(e.target.value)}
-                  placeholder="Ej: 107.00"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-3 text-lg font-semibold outline-none focus:border-teal-500"
-                />
-              </div>
-            )}
 
             {declarado > 0 && (
               <CuadroDiferencia
@@ -724,19 +668,19 @@ export function CierreCajaPage() {
               />
             )}
 
-            {(requiereYape || yapeDeclarado.trim() !== '') && (
+            {requiereYape && (
               <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50/50 p-4">
                 <label className="mb-1 flex items-center gap-2 text-sm font-medium text-purple-900">
                   <Smartphone className="h-4 w-4" />
                   ¿Cuánto ves en tu app Yape?
+                  <span className="text-xs font-normal text-purple-700">(obligatorio)</span>
                 </label>
                 <p className="mb-2 text-xs text-purple-700">
                   Según el sistema: {formatMoney(yapeEsperado)}
                 </p>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   value={yapeDeclarado}
                   onChange={(e) => setYapeDeclarado(e.target.value)}
                   placeholder="Ej: 85.00"
@@ -757,7 +701,7 @@ export function CierreCajaPage() {
               </div>
             )}
 
-            {hayDiferencia && declarado > 0 && (
+            {hayDiferencia && (declarado > 0 || yapeDeclarado.trim() !== '') && (
               <div className="mt-4">
                 <label className="mb-1 block text-sm font-medium text-amber-800">
                   Motivo de la diferencia (obligatorio)
@@ -765,33 +709,43 @@ export function CierreCajaPage() {
                 <textarea
                   value={motivoDiferencia}
                   onChange={(e) => setMotivoDiferencia(e.target.value)}
+                  onInput={(e) => setMotivoDiferencia(e.currentTarget.value)}
                   placeholder="Ej: vuelto mal dado, gasto sin anotar, Yape no registrado…"
-                  rows={2}
-                  className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                  rows={3}
+                  className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-base outline-none focus:border-amber-500"
                 />
+                <p className="mt-1 text-xs text-amber-700">
+                  {motivoOk ? '✓ Motivo listo' : `${motivoDiferencia.trim().length}/3 caracteres mínimos`}
+                </p>
               </div>
             )}
 
-            <textarea
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-              placeholder="Notas opcionales del día…"
-              rows={2}
-              className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500"
-            />
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-slate-700">Notas (opcional)</label>
+              <textarea
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                placeholder="Algo extra del día…"
+                rows={2}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-teal-500"
+              />
+            </div>
 
-            <button
-              onClick={handleCierre}
-              disabled={cerrando || !puedeCerrar}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 py-3.5 font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
-            >
-              {cerrando ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <CheckCircle className="h-5 w-5" />
-              )}
-              {cajaCerrada ? 'Guardar cambios del cierre' : 'Guardar cierre del día'}
-            </button>
+            <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-4 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95 sm:static sm:mt-4 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+              <button
+                type="button"
+                onClick={handleCierre}
+                disabled={cerrando || !puedeCerrar}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 py-3.5 font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {cerrando ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-5 w-5" />
+                )}
+                {cajaCerrada ? 'Guardar cambios del cierre' : 'Guardar cierre del día'}
+              </button>
+            </div>
           </div>
         </>
       )}

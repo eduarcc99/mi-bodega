@@ -44,6 +44,14 @@ export function stockBajo(stock: number, minimo: number): boolean {
   return stock <= minimo
 }
 
+/** Parsea montos desde inputs (acepta coma decimal en móvil). */
+export function parseMonto(value: string): number {
+  const normalized = value.trim().replace(/\s/g, '').replace(',', '.')
+  if (!normalized) return 0
+  const n = parseFloat(normalized)
+  return Number.isFinite(n) ? n : 0
+}
+
 /** Fecha local YYYY-MM-DD (no UTC — evita que caja quede vacía después de las 7 PM en Perú) */
 export function todayLocalISO(d = new Date()): string {
   const y = d.getFullYear()
