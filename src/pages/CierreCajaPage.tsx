@@ -244,8 +244,8 @@ export function CierreCajaPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Mi caja del día</h1>
-          <p className="text-slate-500">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Mi caja del día</h1>
+          <p className="text-slate-500 dark:text-slate-400">
             Abre en la mañana, anota gastos y cierra con conteo — Cajero: {perfil?.nombre}
           </p>
         </div>
@@ -266,10 +266,12 @@ export function CierreCajaPage() {
       </div>
 
       {mensaje && (
-        <div className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{mensaje}</div>
+        <div className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
+          {mensaje}
+        </div>
       )}
       {error && (
-        <div className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-200">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -277,12 +279,12 @@ export function CierreCajaPage() {
 
       {/* —— Apertura —— */}
       {necesitaAbrir && (
-        <div className="rounded-xl border-2 border-teal-300 bg-teal-50 p-6 shadow-sm">
+        <div className="rounded-xl border-2 border-teal-300 bg-teal-50 p-6 shadow-sm dark:border-teal-700 dark:bg-teal-950/50">
           <div className="mb-4 flex items-center gap-2">
-            <Unlock className="h-6 w-6 text-teal-700" />
-            <h2 className="text-lg font-bold text-teal-900">Abrir caja</h2>
+            <Unlock className="h-6 w-6 text-teal-700 dark:text-teal-300" />
+            <h2 className="text-lg font-bold text-teal-900 dark:text-teal-100">Abrir caja</h2>
           </div>
-          <p className="mb-4 text-sm text-teal-800">
+          <p className="mb-4 text-sm text-teal-800 dark:text-teal-200">
             Cuenta el efectivo con el que empiezas el día (billetes y monedas) y confírmalo.
             {resumen && resumen.efectivoInicial > 0 && !resumen.apertura && (
               <span className="mt-1 block text-xs">
@@ -313,13 +315,13 @@ export function CierreCajaPage() {
 
       {/* —— Resumen bloqueado tras cierre —— */}
       {modoResumen && resumen?.cierreExistente && (
-        <div className="rounded-xl border-2 border-emerald-300 bg-white p-6 shadow-sm">
+        <div className="rounded-xl border-2 border-emerald-300 bg-white p-6 shadow-sm dark:border-emerald-800">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-2">
               <Lock className="h-5 w-5 text-emerald-600" />
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Caja cerrada — resumen del día</h2>
-                <p className="text-xs text-slate-500">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Caja cerrada — resumen del día</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Guardado {new Date(resumen.cierreExistente.fecha_hora).toLocaleString('es-PE')} ·
                   solo lectura
                 </p>
@@ -388,7 +390,7 @@ export function CierreCajaPage() {
               />
             )}
             {resumen.cierreExistente.motivo_diferencia && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/50 dark:text-amber-100">
                 <span className="font-medium">Motivo diferencia: </span>
                 {resumen.cierreExistente.motivo_diferencia}
               </p>
@@ -400,7 +402,7 @@ export function CierreCajaPage() {
               </p>
             )}
             {(resumen.consumoPropioCosto ?? 0) > 0 && (
-              <p className="mt-2 flex items-start gap-2 text-orange-800">
+              <p className="mt-2 flex items-start gap-2 text-orange-800 dark:text-orange-200">
                 <ShoppingBasket className="mt-0.5 h-4 w-4 shrink-0" />
                 Consumo propio: {formatMoney(resumen.consumoPropioCosto)} al costo (informativo)
               </p>
@@ -413,7 +415,7 @@ export function CierreCajaPage() {
       {!necesitaAbrir && !modoResumen && resumen && (
         <>
           {cajaCerrada && editMode && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
               <span className="flex items-center gap-2">
                 <Pencil className="h-4 w-4" />
                 Editando cierre — al guardar vuelve al resumen
@@ -439,14 +441,14 @@ export function CierreCajaPage() {
           </div>
 
           {(resumen.consumoPropioCosto ?? 0) > 0 && (
-            <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+            <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900 dark:border-orange-800 dark:bg-orange-950/50 dark:text-orange-100">
               <div className="flex items-start gap-2">
                 <ShoppingBasket className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
                   <p className="font-medium">
                     Consumo propio: {formatMoney(resumen.consumoPropioCosto)} (al costo)
                   </p>
-                  <p className="mt-0.5 text-xs text-orange-800/80">
+                  <p className="mt-0.5 text-xs text-orange-800/80 dark:text-orange-200/80">
                     Dejó de ganar {formatMoney(resumen.consumoPropioOportunidad)} ·{' '}
                     <span className="inline-flex items-center gap-1">
                       <Info className="h-3 w-3" />
@@ -458,8 +460,8 @@ export function CierreCajaPage() {
             </div>
           )}
 
-          <div className="rounded-xl border-2 border-teal-200 bg-teal-50 p-5">
-            <h2 className="mb-4 flex items-center gap-2 font-bold text-teal-900">
+          <div className="rounded-xl border-2 border-teal-200 bg-teal-50 p-5 dark:border-teal-800 dark:bg-teal-950/50">
+            <h2 className="mb-4 flex items-center gap-2 font-bold text-teal-900 dark:text-teal-100">
               <Calculator className="h-5 w-5" />
               ¿Cuánto debería haber en caja?
             </h2>
@@ -502,16 +504,16 @@ export function CierreCajaPage() {
                   negativo
                 />
               )}
-              <div className="my-2 border-t border-teal-300" />
+              <div className="my-2 border-t border-teal-300 dark:border-teal-700" />
               <FilaCalculo
-                icon={<Wallet className="h-4 w-4 text-teal-700" />}
+                icon={<Wallet className="h-4 w-4 text-teal-700 dark:text-teal-300" />}
                 label="Deberías tener en caja"
                 valor={efectivoEsperado}
                 destacado
               />
               {(ventasYape > 0 || devolucionesYape > 0 || comprasYape > 0) && (
                 <>
-                  <div className="my-2 border-t border-teal-300" />
+                  <div className="my-2 border-t border-teal-300 dark:border-teal-700" />
                   {ventasYape > 0 && (
                     <FilaCalculo
                       icon={<Smartphone className="h-4 w-4 text-purple-600" />}
@@ -550,10 +552,10 @@ export function CierreCajaPage() {
           {/* Gastos */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-slate-900">Gastos del día</h2>
+              <h2 className="font-semibold text-slate-900 dark:text-slate-100">Gastos del día</h2>
               <button
                 onClick={() => setShowGasto(true)}
-                className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950/70"
               >
                 <Minus className="h-4 w-4" />
                 Anotar gasto
@@ -600,17 +602,17 @@ export function CierreCajaPage() {
 
           {/* Movimientos */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 font-semibold text-slate-900">Movimientos</h2>
+            <h2 className="mb-3 font-semibold text-slate-900 dark:text-slate-100">Movimientos</h2>
             <div className="max-h-72 space-y-2 overflow-y-auto">
               {resumen.movimientos.map((m) => (
                 <div
                   key={m.id}
                   className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
                     !m.afectaCaja
-                      ? 'bg-purple-50 text-purple-800'
+                      ? 'bg-purple-50 text-purple-900 dark:bg-purple-950/50 dark:text-purple-100'
                       : m.esEntrada
-                        ? 'bg-emerald-50'
-                        : 'bg-red-50'
+                        ? 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100'
+                        : 'bg-red-50 text-red-900 dark:bg-red-950/50 dark:text-red-100'
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -642,7 +644,7 @@ export function CierreCajaPage() {
 
           {/* Cierre / conteo */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 pb-28 shadow-sm sm:pb-5">
-            <h2 className="mb-4 font-semibold text-slate-900">Cerrar caja — conteo final</h2>
+            <h2 className="mb-4 font-semibold text-slate-900 dark:text-slate-100">Cerrar caja — conteo final</h2>
 
             <div className="mb-4">
               <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -669,13 +671,13 @@ export function CierreCajaPage() {
             )}
 
             {requiereYape && (
-              <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50/50 p-4">
-                <label className="mb-1 flex items-center gap-2 text-sm font-medium text-purple-900">
+              <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-800 dark:bg-purple-950/40">
+                <label className="mb-1 flex items-center gap-2 text-sm font-medium text-purple-900 dark:text-purple-100">
                   <Smartphone className="h-4 w-4" />
                   ¿Cuánto ves en tu app Yape?
-                  <span className="text-xs font-normal text-purple-700">(obligatorio)</span>
+                  <span className="text-xs font-normal text-purple-700 dark:text-purple-300">(obligatorio)</span>
                 </label>
-                <p className="mb-2 text-xs text-purple-700">
+                <p className="mb-2 text-xs text-purple-700 dark:text-purple-300">
                   Según el sistema: {formatMoney(yapeEsperado)}
                 </p>
                 <input
@@ -703,7 +705,7 @@ export function CierreCajaPage() {
 
             {hayDiferencia && (declarado > 0 || yapeDeclarado.trim() !== '') && (
               <div className="mt-4">
-                <label className="mb-1 block text-sm font-medium text-amber-800">
+                <label className="mb-1 block text-sm font-medium text-amber-800 dark:text-amber-200">
                   Motivo de la diferencia (obligatorio)
                 </label>
                 <textarea
@@ -712,9 +714,9 @@ export function CierreCajaPage() {
                   onInput={(e) => setMotivoDiferencia(e.currentTarget.value)}
                   placeholder="Ej: vuelto mal dado, gasto sin anotar, Yape no registrado…"
                   rows={3}
-                  className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-base outline-none focus:border-amber-500"
+                  className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-base outline-none focus:border-amber-500 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-50"
                 />
-                <p className="mt-1 text-xs text-amber-700">
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                   {motivoOk ? '✓ Motivo listo' : `${motivoDiferencia.trim().length}/3 caracteres mínimos`}
                 </p>
               </div>
@@ -752,9 +754,9 @@ export function CierreCajaPage() {
 
       {showGasto && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="mb-1 font-bold text-slate-900">Anotar gasto</h3>
-            <p className="mb-4 text-sm text-slate-500">Ej: Compra pollo en mercado</p>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:border dark:border-slate-700">
+            <h3 className="mb-1 font-bold text-slate-900 dark:text-slate-100">Anotar gasto</h3>
+            <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">Ej: Compra pollo en mercado</p>
             <div className="space-y-3">
               <input
                 value={gastoDesc}
@@ -786,7 +788,7 @@ export function CierreCajaPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowGasto(false)}
-                  className="flex-1 rounded-lg border py-2.5 text-slate-600"
+                  className="flex-1 rounded-lg border py-2.5 text-slate-600 dark:border-slate-600 dark:text-slate-300"
                 >
                   Cancelar
                 </button>
@@ -817,11 +819,19 @@ function MiniKpi({
   return (
     <div
       className={`rounded-xl border p-4 shadow-sm ${
-        accent ? 'border-teal-200 bg-teal-50' : 'border-slate-200 bg-white'
+        accent
+          ? 'border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/50'
+          : 'border-slate-200 bg-white'
       }`}
     >
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`mt-1 text-xl font-bold ${accent ? 'text-teal-800' : 'text-slate-900'}`}>{value}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+      <p
+        className={`mt-1 text-xl font-bold ${
+          accent ? 'text-teal-800 dark:text-teal-200' : 'text-slate-900'
+        }`}
+      >
+        {value}
+      </p>
     </div>
   )
 }
@@ -842,9 +852,17 @@ function ResumenLinea({
   alert?: boolean
 }) {
   return (
-    <div className={`flex justify-between ${bold ? 'font-bold' : ''} ${alert ? 'text-amber-800' : ''}`}>
+    <div className={`flex justify-between ${bold ? 'font-bold' : ''} ${alert ? 'text-amber-800 dark:text-amber-200' : ''}`}>
       <span className="text-slate-600">{label}</span>
-      <span className={positivo ? 'text-emerald-700' : negativo ? 'text-red-600' : 'text-slate-900'}>
+      <span
+        className={
+          positivo
+            ? 'text-emerald-700 dark:text-emerald-400'
+            : negativo
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-slate-900'
+        }
+      >
         {value}
       </span>
     </div>
@@ -871,7 +889,11 @@ function CuadroDiferencia({
   return (
     <div
       className={`rounded-lg p-4 ${
-        ok ? 'bg-emerald-50 text-emerald-800' : falta ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'
+        ok
+          ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200'
+          : falta
+            ? 'bg-red-50 text-red-800 dark:bg-red-950/50 dark:text-red-200'
+            : 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
       } ${compacto ? 'p-3' : ''}`}
     >
       <p className={`font-bold ${compacto ? 'text-base' : 'text-lg'}`}>
@@ -906,16 +928,28 @@ function FilaCalculo({
 }) {
   return (
     <div
-      className={`flex items-center justify-between ${destacado ? 'text-base font-bold text-teal-900' : ''}`}
+      className={`flex items-center justify-between text-teal-900 dark:text-teal-100 ${
+        destacado ? 'text-base font-bold' : ''
+      }`}
     >
       <div className="flex items-center gap-2">
         {icon}
         <div>
           <span>{label}</span>
-          {hint && <p className="text-xs font-normal text-teal-600">{hint}</p>}
+          {hint && <p className="text-xs font-normal text-teal-600 dark:text-teal-400">{hint}</p>}
         </div>
       </div>
-      <span className={positivo ? 'text-emerald-700' : negativo ? 'text-red-600' : ''}>
+      <span
+        className={
+          positivo
+            ? 'text-emerald-700 dark:text-emerald-400'
+            : negativo
+              ? 'text-red-600 dark:text-red-400'
+              : destacado
+                ? 'text-teal-900 dark:text-teal-100'
+                : ''
+        }
+      >
         {negativo && valor > 0 ? '−' : positivo && valor > 0 ? '+' : ''}
         {formatMoney(valor)}
       </span>

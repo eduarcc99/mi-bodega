@@ -94,3 +94,28 @@ input, select, button {
 .dark main tr.hover\:bg-slate-50:hover {
   background-color: rgb(30 41 59);
 }
+
+/* Pastel cards: fondo oscuro + texto legible (evita herencia clara sobre bg-*-50) */
+.dark main .bg-teal-50 {
+  background-color: rgb(19 78 74 / 0.45);
+}
+
+.dark main .bg-emerald-50 {
+  background-color: rgb(6 78 59 / 0.45);
+}
+
+.dark main .bg-red-50 {
+  background-color: rgb(127 29 29 / 0.35);
+}
+
+.dark main .bg-amber-50 {
+  background-color: rgb(120 53 15 / 0.35);
+}
+
+.dark main .bg-purple-50 {
+  background-color: rgb(88 28 135 / 0.35);
+}
+
+.dark main .bg-orange-50 {
+  background-color: rgb(124 45 18 / 0.35);
+}
