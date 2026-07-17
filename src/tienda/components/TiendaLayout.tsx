@@ -1,10 +1,12 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { ShoppingBag, MapPin, Clock, ArrowLeft } from 'lucide-react'
 import { TIENDA_CONFIG } from '@/tienda/config'
+import { tiendaPath } from '@/tienda/routes'
 import { mensajeHorario, mensajeHorarioHoy, isTiendaAbierta } from '@/tienda/lib/horario'
 import { totalConDelivery } from '@/tienda/lib/delivery'
 import { useTiendaCart } from '@/tienda/context/TiendaCartContext'
 import { formatMoney } from '@/lib/utils'
+import { useDocumentMeta } from '@/hooks/useDocumentMeta'
 
 export function TiendaLayout() {
   const { count, total: subtotal } = useTiendaCart()
@@ -13,6 +15,8 @@ export function TiendaLayout() {
   const abierta = isTiendaAbierta()
   const enCarrito = location.pathname.includes('/carrito') || location.pathname.includes('/checkout')
   const enConfirmado = location.pathname.includes('/confirmado')
+
+  useDocumentMeta(`${TIENDA_CONFIG.nombre} — Pedidos`, '/favicon-marghot.svg')
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-slate-50">
@@ -51,7 +55,7 @@ export function TiendaLayout() {
           ) : (
             <div className="flex items-center gap-3">
               <Link
-                to="/pedir"
+                to={tiendaPath()}
                 className="rounded-full bg-white/10 p-2 hover:bg-white/20"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -73,7 +77,7 @@ export function TiendaLayout() {
 
       {!enCarrito && !enConfirmado && count > 0 && (
         <Link
-          to="/pedir/carrito"
+          to={tiendaPath('carrito')}
           className="fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 items-center justify-between rounded-2xl bg-rose-900 px-5 py-4 text-white shadow-2xl shadow-rose-900/30 transition hover:bg-rose-800"
         >
           <div className="flex items-center gap-3">

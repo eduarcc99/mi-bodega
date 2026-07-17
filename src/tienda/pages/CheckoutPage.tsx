@@ -13,6 +13,7 @@ import {
   totalConDelivery,
 } from '@/tienda/lib/delivery'
 import { TIENDA_CONFIG } from '@/tienda/config'
+import { tiendaPath } from '@/tienda/routes'
 import type { CheckoutForm } from '@/tienda/types'
 
 const emptyForm: CheckoutForm = {
@@ -35,11 +36,11 @@ export function CheckoutPage() {
   const envioGratis = tieneEnvioGratis(subtotal)
 
   if (!isTiendaAbierta()) {
-    return <Navigate to="/pedir" replace />
+    return <Navigate to={tiendaPath()} replace />
   }
 
   if (items.length === 0) {
-    return <Navigate to="/pedir/carrito" replace />
+    return <Navigate to={tiendaPath('carrito')} replace />
   }
 
   function update(field: keyof CheckoutForm, value: string) {
@@ -61,7 +62,7 @@ export function CheckoutPage() {
         total,
       )
       clearCart()
-      navigate('/pedir/confirmado', {
+      navigate(tiendaPath('confirmado'), {
         state: { waUrl, pedidoId, subtotal, delivery, total, nombre: form.nombre },
         replace: true,
       })

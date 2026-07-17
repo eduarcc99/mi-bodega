@@ -2,6 +2,7 @@ import { Link, useLocation, Navigate } from 'react-router-dom'
 import { CheckCircle, MessageCircle, ShoppingBag } from 'lucide-react'
 import { formatMoney } from '@/lib/utils'
 import { TIENDA_CONFIG } from '@/tienda/config'
+import { tiendaPath } from '@/tienda/routes'
 
 interface ConfirmadoState {
   waUrl: string
@@ -17,7 +18,7 @@ export function ConfirmadoPage() {
   const state = location.state as ConfirmadoState | null
 
   if (!state?.pedidoId) {
-    return <Navigate to="/pedir" replace />
+    return <Navigate to={tiendaPath()} replace />
   }
 
   return (
@@ -56,7 +57,7 @@ export function ConfirmadoPage() {
       </a>
 
       <Link
-        to="/pedir"
+        to={tiendaPath()}
         className="inline-flex items-center gap-2 text-sm font-semibold text-rose-800 hover:text-rose-900"
       >
         <ShoppingBag className="h-4 w-4" />

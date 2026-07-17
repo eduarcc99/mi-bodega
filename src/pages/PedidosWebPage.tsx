@@ -146,7 +146,7 @@ export function PedidosWebPage() {
         <div className="rounded-xl border border-dashed border-slate-300 bg-white py-16 text-center text-slate-500">
           <ClipboardList className="mx-auto h-12 w-12 text-slate-300" />
           <p className="mt-4 font-medium">No hay pedidos en este filtro</p>
-          <p className="text-sm">Los pedidos de /pedir aparecerán aquí</p>
+          <p className="text-sm">Los pedidos de la tienda web aparecerán aquí</p>
         </div>
       ) : (
         <div className="space-y-4">

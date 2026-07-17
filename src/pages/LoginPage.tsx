@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { BrandThemeToggle } from '@/components/BrandThemeToggle'
 import { isSupabaseConfigured } from '@/lib/supabase'
+import { useDocumentMeta } from '@/hooks/useDocumentMeta'
 
 export function LoginPage() {
   const { signIn, user, loading } = useAuth()
@@ -12,6 +13,8 @@ export function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useDocumentMeta('Acceso — Mi Bodega', '/favicon_.svg')
 
   if (!loading && user) return <Navigate to="/" replace />
 

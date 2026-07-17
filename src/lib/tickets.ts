@@ -38,7 +38,7 @@ export function buildDevolucionTicketInfo(
   }
 }
 
-async function fetchTotalDevueltoPorVentas(ventaIds: string[]): Promise<Map<string, number>> {
+export async function fetchTotalDevueltoPorVentas(ventaIds: string[]): Promise<Map<string, number>> {
   const map = new Map<string, number>()
   if (ventaIds.length === 0) return map
 

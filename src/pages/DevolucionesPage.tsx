@@ -6,9 +6,11 @@ import {
   CheckCircle,
   AlertCircle,
   Package,
+  Receipt,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatMoney } from '@/lib/utils'
+import { codigoTicket } from '@/lib/tickets'
 import {
   buscarVentas,
   fetchVentaParaDevolucion,
@@ -17,15 +19,14 @@ import {
   maxCantidadDevolucion,
   etiquetaCantidadDevolucion,
   registrarDevolucion,
+  type VentaBusqueda,
   type VentaParaDevolucion,
 } from '@/lib/devoluciones'
 
 export function DevolucionesPage() {
   const { perfil } = useAuth()
   const [busqueda, setBusqueda] = useState('')
-  const [ventasRecientes, setVentasRecientes] = useState<
-    { id: string; fecha: string; total: number; metodo_pago: string }[]
-  >([])
+  const [ventasRecientes, setVentasRecientes] = useState<VentaBusqueda[]>([])
   const [venta, setVenta] = useState<VentaParaDevolucion | null>(null)
   const [cantidades, setCantidades] = useState<Record<string, number>>({})
   const [motivo, setMotivo] = useState('')
@@ -184,41 +185,148 @@ export function DevolucionesPage() {
       </button>
 
       {!venta && ventasRecientes.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600">
-            Últimas 10 ventas
-          </p>
-          {ventasRecientes.map((v) => (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-slate-600">Últimas 10 ventas</p>
+          {ventasRecientes.map((v) => {
+            const dev = v.devolucion
+            const devCompleta = dev.devolucion_completa
+            const devParcial = dev.tiene_devolucion && !dev.devolucion_completa
+
+            return (
             <button
               key={v.id}
               onClick={() => seleccionarVenta(v.id)}
-              className="flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-teal-50"
+              className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left shadow-sm transition ${
+                devCompleta
+                  ? 'border-red-200 bg-red-50/60 hover:border-red-300'
+                  : devParcial
+                    ? 'border-amber-200 bg-amber-50/60 hover:border-amber-300'
+                    : 'border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/50'
+              }`}
             >
-              <div>
-                <p className="font-medium text-slate-900">
-                  Ticket {v.id.slice(0, 8).toUpperCase()}
-                </p>
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                  devCompleta
+                    ? 'bg-red-100'
+                    : devParcial
+                      ? 'bg-amber-100'
+                      : 'bg-teal-50'
+                }`}
+              >
+                {dev.tiene_devolucion ? (
+                  <RotateCcw
+                    className={`h-5 w-5 ${devCompleta ? 'text-red-700' : 'text-amber-700'}`}
+                  />
+                ) : (
+                  <Receipt className="h-5 w-5 text-teal-700" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p
+                    className={`font-semibold ${
+                      devCompleta ? 'text-red-900 line-through decoration-red-400' : 'text-slate-900'
+                    }`}
+                  >
+                    Ticket {codigoTicket(v.id)}
+                  </p>
+                  {devCompleta && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                      Devuelto
+                    </span>
+                  )}
+                  {devParcial && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                      Dev. parcial
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500">
-                  {new Date(v.fecha).toLocaleString('es-PE')} · {metodoLabel[v.metodo_pago as keyof typeof metodoLabel] ?? v.metodo_pago}
+                  {new Date(v.fecha).toLocaleString('es-PE')} ·{' '}
+                  {metodoLabel[v.metodo_pago as keyof typeof metodoLabel] ?? v.metodo_pago}
                 </p>
               </div>
-              <span className="font-semibold text-teal-700">{formatMoney(Number(v.total))}</span>
+              <div className="shrink-0 text-right">
+                <p
+                  className={`font-bold ${
+                    devCompleta
+                      ? 'text-red-700 line-through decoration-red-300'
+                      : devParcial
+                        ? 'text-amber-900'
+                        : 'text-slate-900'
+                  }`}
+                >
+                  {formatMoney(Number(v.total))}
+                </p>
+                {devParcial && (
+                  <p className="text-xs font-medium text-red-600">
+                    −{formatMoney(dev.total_devuelto)} dev.
+                  </p>
+                )}
+              </div>
             </button>
-          ))}
+          )})}
         </div>
       )}
 
       {venta && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-start justify-between">
+        <div
+          className={`relative overflow-hidden rounded-xl border bg-white p-5 shadow-sm ${
+            venta.devolucion.devolucion_completa
+              ? 'border-red-200 ring-2 ring-red-100'
+              : venta.devolucion.tiene_devolucion
+                ? 'border-amber-200 ring-2 ring-amber-100'
+                : 'border-slate-200'
+          }`}
+        >
+          {venta.devolucion.tiene_devolucion && (
+            <div
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+              aria-hidden
+            >
+              <span
+                className={`rotate-[-18deg] select-none text-3xl font-black uppercase tracking-[0.15em] ${
+                  venta.devolucion.devolucion_completa ? 'text-red-200/80' : 'text-amber-200/80'
+                }`}
+              >
+                {venta.devolucion.devolucion_completa ? 'DEVUELTO' : 'DEV. PARCIAL'}
+              </span>
+            </div>
+          )}
+
+          <div className="relative mb-4 flex items-start justify-between">
             <div>
-              <h2 className="font-bold text-slate-900">
-                Ticket {venta.id.slice(0, 8).toUpperCase()}
-              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  className={`font-bold ${
+                    venta.devolucion.devolucion_completa
+                      ? 'text-red-900 line-through decoration-red-400'
+                      : 'text-slate-900'
+                  }`}
+                >
+                  Ticket {codigoTicket(venta.id)}
+                </h2>
+                {venta.devolucion.devolucion_completa && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                    Devuelto
+                  </span>
+                )}
+                {venta.devolucion.tiene_devolucion && !venta.devolucion.devolucion_completa && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                    Dev. parcial
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-slate-500">
                 {new Date(venta.fecha).toLocaleString('es-PE')} ·{' '}
                 {metodoLabel[venta.metodo_pago]} · Cajero: {venta.perfiles?.nombre ?? '—'}
               </p>
+              {venta.devolucion.tiene_devolucion && !venta.devolucion.devolucion_completa && (
+                <p className="mt-1 text-xs font-medium text-red-600">
+                  Ya devuelto: {formatMoney(venta.devolucion.total_devuelto)} · Neto:{' '}
+                  {formatMoney(venta.total - venta.devolucion.total_devuelto)}
+                </p>
+              )}
             </div>
             <button
               onClick={() => setVenta(null)}

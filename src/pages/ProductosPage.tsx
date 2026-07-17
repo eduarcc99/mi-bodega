@@ -891,7 +891,7 @@ export function ProductosPage() {
                   <p className="text-xs text-slate-500">
                     {form.activo
                       ? 'Se vende en POS y aparece en la tienda MARGHOT'
-                      : 'No se vende ni aparece en POS ni en /pedir'}
+                      : 'No se vende ni aparece en POS ni en la tienda web'}
                   </p>
                 </div>
                 <button

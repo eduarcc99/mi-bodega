@@ -3,6 +3,7 @@ import { Minus, Plus, Trash2, ShoppingBag, Sparkles } from 'lucide-react'
 import { getOptimizedImageUrl } from '@/lib/cloudinary'
 import { formatMoney } from '@/lib/utils'
 import { lineSubtotal, useTiendaCart } from '@/tienda/context/TiendaCartContext'
+import { tiendaPath } from '@/tienda/routes'
 import {
   costoDelivery,
   faltanteEnvioGratis,
@@ -30,7 +31,7 @@ export function CarritoPage() {
         <ShoppingBag className="h-12 w-12 text-slate-300" />
         <p className="mt-4 font-medium text-slate-700">Tu carrito está vacío</p>
         <Link
-          to="/pedir"
+          to={tiendaPath()}
           className="mt-4 rounded-xl bg-rose-900 px-6 py-2.5 text-sm font-semibold text-white"
         >
           Ver productos
@@ -125,7 +126,7 @@ export function CarritoPage() {
         </div>
 
         <Link
-          to="/pedir/checkout"
+          to={tiendaPath('checkout')}
           className="mt-4 flex w-full items-center justify-center rounded-xl bg-rose-900 py-3.5 font-semibold text-white hover:bg-rose-800"
         >
           Continuar pedido

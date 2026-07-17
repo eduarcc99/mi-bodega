@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
-import { ProtectedRoute, AdminRoute, CajeroRedirect } from '@/components/ProtectedRoute'
+import { ProtectedRoute, AdminRoute } from '@/components/ProtectedRoute'
+import { RootRedirect } from '@/components/RootRedirect'
+import { PedirLegacyRedirect } from '@/components/PedirLegacyRedirect'
 import { Layout } from '@/components/Layout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -22,6 +24,7 @@ import { TiendaPage } from '@/tienda/pages/TiendaPage'
 import { CarritoPage } from '@/tienda/pages/CarritoPage'
 import { CheckoutPage } from '@/tienda/pages/CheckoutPage'
 import { ConfirmadoPage } from '@/tienda/pages/ConfirmadoPage'
+import { TIENDA_BASE } from '@/tienda/routes'
 
 export default function App() {
   return (
@@ -29,11 +32,15 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
         <Routes>
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Tienda pública — sin login, código aislado en src/tienda/ */}
+          {/* Link antiguo → tienda */}
+          <Route path="/pedir/*" element={<PedirLegacyRedirect />} />
+
+          {/* Tienda pública MARGHOT — sin login */}
           <Route
-            path="/pedir"
+            path={TIENDA_BASE}
             element={
               <TiendaCartProvider>
                 <TiendaLayout />
@@ -47,7 +54,6 @@ export default function App() {
           </Route>
 
           <Route element={<ProtectedRoute />}>
-            <Route index element={<CajeroRedirect />} />
             <Route element={<Layout />}>
               <Route path="/pos" element={<PosPage />} />
               <Route path="/tickets" element={<HistorialTicketsPage />} />

@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import {
   RotateCcw,
   LayoutDashboard,
@@ -94,6 +95,8 @@ export function Layout() {
   const { perfil, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useDocumentMeta("Mi Bodega", "/favicon_.svg");
 
   async function handleLogout() {
     await signOut();

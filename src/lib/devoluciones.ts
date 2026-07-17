@@ -1,5 +1,10 @@
 import { supabase } from '@/lib/supabase'
 import { localDayRangeISO } from '@/lib/utils'
+import {
+  buildDevolucionTicketInfo,
+  fetchTotalDevueltoPorVentas,
+  type DevolucionTicketInfo,
+} from '@/lib/tickets'
 import type { MetodoPago } from '@/types/database'
 import type { ModoVenta } from '@/lib/pos'
 
@@ -18,6 +23,14 @@ export interface VentaDetalleDevolucion {
   unidades_disponibles: number
 }
 
+export interface VentaBusqueda {
+  id: string
+  fecha: string
+  total: number
+  metodo_pago: MetodoPago
+  devolucion: DevolucionTicketInfo
+}
+
 export interface VentaParaDevolucion {
   id: string
   fecha: string
@@ -27,6 +40,7 @@ export interface VentaParaDevolucion {
   cajero_id: string
   perfiles?: { nombre: string }
   detalles: VentaDetalleDevolucion[]
+  devolucion: DevolucionTicketInfo
 }
 
 export interface LineaDevolucion {
@@ -75,7 +89,21 @@ function montoLineaDevolucion(
   return Math.round((bruto - descProporcional) * 100) / 100
 }
 
-export async function buscarVentas(query: string): Promise<{ id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]> {
+async function enriquecerVentasConDevoluciones(
+  ventas: { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[],
+): Promise<VentaBusqueda[]> {
+  const devMap = await fetchTotalDevueltoPorVentas(ventas.map((v) => v.id))
+  return ventas.map((v) => {
+    const total = Number(v.total)
+    return {
+      ...v,
+      total,
+      devolucion: buildDevolucionTicketInfo(total, devMap.get(v.id) ?? 0),
+    }
+  })
+}
+
+export async function buscarVentas(query: string): Promise<VentaBusqueda[]> {
   const q = query.trim().toLowerCase()
   if (!q) return fetchUltimasVentas(10)
 
@@ -86,7 +114,11 @@ export async function buscarVentas(query: string): Promise<{ id: string; fecha: 
       .eq('estado', 'completada')
       .ilike('id', `${q}%`)
       .limit(10)
-    if (byId?.length) return byId as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]
+    if (byId?.length) {
+      return enriquecerVentasConDevoluciones(
+        byId as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[],
+      )
+    }
   }
 
   const hoy = new Date()
@@ -99,12 +131,12 @@ export async function buscarVentas(query: string): Promise<{ id: string; fecha: 
     .order('fecha', { ascending: false })
     .limit(20)
 
-  return (data ?? []) as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]
+  return enriquecerVentasConDevoluciones(
+    (data ?? []) as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[],
+  )
 }
 
-export async function fetchUltimasVentas(
-  limit = 10,
-): Promise<{ id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]> {
+export async function fetchUltimasVentas(limit = 10): Promise<VentaBusqueda[]> {
   const { data, error } = await supabase
     .from('ventas')
     .select('id, fecha, total, metodo_pago')
@@ -113,7 +145,9 @@ export async function fetchUltimasVentas(
     .limit(limit)
 
   if (error) throw new Error(error.message)
-  return (data ?? []) as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[]
+  return enriquecerVentasConDevoluciones(
+    (data ?? []) as { id: string; fecha: string; total: number; metodo_pago: MetodoPago }[],
+  )
 }
 
 export async function fetchVentaParaDevolucion(ventaId: string): Promise<VentaParaDevolucion | null> {
@@ -188,15 +222,19 @@ export async function fetchVentaParaDevolucion(ventaId: string): Promise<VentaPa
     },
   )
 
+  const total = Number(venta.total)
+  const devMap = await fetchTotalDevueltoPorVentas([ventaId])
+
   return {
     id: venta.id,
     fecha: venta.fecha,
-    total: Number(venta.total),
+    total,
     metodo_pago: venta.metodo_pago,
     estado: venta.estado,
     cajero_id: venta.cajero_id,
-    perfiles: (venta.perfiles as unknown as { nombre: string } | undefined),
+    perfiles: venta.perfiles as unknown as { nombre: string } | undefined,
     detalles,
+    devolucion: buildDevolucionTicketInfo(total, devMap.get(ventaId) ?? 0),
   }
 }
 
