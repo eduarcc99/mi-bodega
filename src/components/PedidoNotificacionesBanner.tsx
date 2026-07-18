@@ -1,5 +1,24 @@
-import { Bell, BellOff, BellRing, Smartphone, Volume2 } from 'lucide-react'
+import { useState } from 'react'
+import { Bell, BellOff, BellRing, Volume2, X } from 'lucide-react'
 import type { EstadoNotificaciones } from '@/lib/notificaciones-pedidos'
+
+const STORAGE_KEY = 'mi-bodega-alertas-ok'
+
+function alertasMarcadasOk(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function marcarAlertasOk() {
+  try {
+    localStorage.setItem(STORAGE_KEY, '1')
+  } catch {
+    /* ignore */
+  }
+}
 
 interface PedidoNotificacionesBannerProps {
   permiso: EstadoNotificaciones
@@ -14,65 +33,73 @@ export function PedidoNotificacionesBanner({
   onActivar,
   onProbar,
 }: PedidoNotificacionesBannerProps) {
+  const [oculto, setOculto] = useState(alertasMarcadasOk)
+
+  function omitir() {
+    marcarAlertasOk()
+    setOculto(true)
+  }
+
+  function probarYOcultar() {
+    onProbar()
+    marcarAlertasOk()
+    setOculto(true)
+  }
+
+  if (permiso === 'granted' && escuchando && oculto) {
+    return null
+  }
+
   if (permiso === 'granted' && escuchando) {
     return (
-      <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-          <div>
-            <p className="text-sm font-semibold text-emerald-900">Alertas activas</p>
-            <p className="text-xs text-emerald-700">
-              Te avisamos con sonido y notificación cuando llegue un pedido nuevo, aunque tengas
-              otra app abierta.
-            </p>
-          </div>
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-3 py-2 text-xs">
+        <span className="flex items-center gap-1.5 font-medium text-emerald-800">
+          <BellRing className="h-3.5 w-3.5" />
+          Alertas activas
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={probarYOcultar}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+          >
+            <Volume2 className="h-3 w-3" />
+            Probar
+          </button>
+          <button
+            type="button"
+            onClick={omitir}
+            className="rounded-md p-1 text-emerald-600 hover:bg-emerald-100"
+            aria-label="Ocultar aviso"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onProbar}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
-        >
-          <Volume2 className="h-4 w-4" />
-          Probar alerta
-        </button>
       </div>
     )
   }
 
   if (permiso === 'denied') {
     return (
-      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-        <BellOff className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-        <div>
-          <p className="text-sm font-semibold text-amber-900">Notificaciones bloqueadas</p>
-          <p className="text-xs text-amber-800">
-            En tu celular ve a Ajustes del navegador → Mi Bodega → Notificaciones → Permitir.
-            También revisa que la app esté instalada en la pantalla de inicio.
-          </p>
-        </div>
+      <div className="flex items-center gap-2 rounded-lg border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-[11px] text-amber-800">
+        <BellOff className="h-3.5 w-3.5 shrink-0" />
+        <span>Notificaciones bloqueadas — actívalas en ajustes del celular.</span>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3">
-        <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-teal-600" />
-        <div>
-          <p className="text-sm font-semibold text-teal-900">Activa alertas de pedidos</p>
-          <p className="text-xs text-teal-800">
-            Para no perder clientes de noche: sonido + vibración + notificación push cuando entra un
-            pedido web.
-          </p>
-        </div>
-      </div>
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-teal-200/80 bg-teal-50/80 px-3 py-2">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-teal-900">
+        <Bell className="h-3.5 w-3.5 shrink-0" />
+        Alertas de pedidos web
+      </span>
       <button
         type="button"
         onClick={onActivar}
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700"
+        className="shrink-0 rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-700"
       >
-        <Bell className="h-4 w-4" />
-        Activar notificaciones
+        Activar
       </button>
     </div>
   )

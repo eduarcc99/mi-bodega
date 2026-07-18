@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
           display: 'standalone',
           orientation: 'portrait-primary',
           scope: '/',
-          start_url: '/pedidos-web',
+          start_url: '/pos',
           icons: [
             {
               src: 'favicon_.svg',
