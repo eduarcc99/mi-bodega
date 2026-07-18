@@ -20,7 +20,11 @@ import {
 import { useState, type ComponentType } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandThemeToggle } from "@/components/BrandThemeToggle";
-import { PedidoNotificationsProvider } from "@/contexts/PedidoNotificationsContext";
+import {
+  PedidoNotificationsProvider,
+  usePedidoNotificationsContext,
+} from "@/contexts/PedidoNotificationsContext";
+import { PedidoPendienteAlertas } from "@/components/PedidoPendienteAlertas";
 
 type NavItem = {
   to: string;
@@ -70,10 +74,12 @@ function NavItems({
   items,
   onNavigate,
   classNameFn,
+  pedidosPendientes,
 }: {
   items: NavItem[];
   onNavigate?: () => void;
   classNameFn: (args: { isActive: boolean }) => string;
+  pedidosPendientes: number;
 }) {
   return (
     <>
@@ -84,7 +90,14 @@ function NavItems({
           onClick={onNavigate}
           className={classNameFn}
         >
-          <Icon className="h-5 w-5 shrink-0" />
+          <span className="relative shrink-0">
+            <Icon className="h-5 w-5" />
+            {to === "/pedidos-web" && pedidosPendientes > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                {pedidosPendientes > 9 ? "9+" : pedidosPendientes}
+              </span>
+            )}
+          </span>
           {label}
         </NavLink>
       ))}
@@ -92,8 +105,9 @@ function NavItems({
   );
 }
 
-export function Layout() {
+function LayoutContent() {
   const { perfil, signOut, isAdmin } = useAuth();
+  const { pendientesCount } = usePedidoNotificationsContext();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -120,9 +134,9 @@ export function Layout() {
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {isAdmin ? (
-            <NavItems items={adminLinks} classNameFn={linkClass} />
+            <NavItems items={adminLinks} classNameFn={linkClass} pedidosPendientes={pendientesCount} />
           ) : (
-            <NavItems items={cajeroLinks} classNameFn={linkClass} />
+            <NavItems items={cajeroLinks} classNameFn={linkClass} pedidosPendientes={pendientesCount} />
           )}
         </nav>
 
@@ -149,13 +163,20 @@ export function Layout() {
           </div>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             aria-label="Menú"
           >
             {menuOpen ? (
               <X className="h-6 w-6" />
             ) : (
-              <Menu className="h-6 w-6" />
+              <>
+                <Menu className="h-6 w-6" />
+                {pendientesCount > 0 && (
+                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                    {pendientesCount > 9 ? "9+" : pendientesCount}
+                  </span>
+                )}
+              </>
             )}
           </button>
         </header>
@@ -167,12 +188,14 @@ export function Layout() {
                 items={adminLinks}
                 onNavigate={() => setMenuOpen(false)}
                 classNameFn={mobileLinkClass}
+                pedidosPendientes={pendientesCount}
               />
             ) : (
               <NavItems
                 items={cajeroLinks}
                 onNavigate={() => setMenuOpen(false)}
                 classNameFn={mobileLinkClass}
+                pedidosPendientes={pendientesCount}
               />
             )}
             <button
@@ -185,12 +208,22 @@ export function Layout() {
           </nav>
         )}
 
+        <PedidoPendienteAlertas />
+
         <main className="flex-1 overflow-auto p-4 md:p-6 dark:bg-slate-950">
-          <PedidoNotificationsProvider activo={Boolean(perfil)}>
-            <Outlet />
-          </PedidoNotificationsProvider>
+          <Outlet />
         </main>
       </div>
     </div>
+  );
+}
+
+export function Layout() {
+  const { perfil } = useAuth();
+
+  return (
+    <PedidoNotificationsProvider activo={Boolean(perfil)}>
+      <LayoutContent />
+    </PedidoNotificationsProvider>
   );
 }

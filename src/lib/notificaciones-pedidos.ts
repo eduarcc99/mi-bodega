@@ -53,33 +53,62 @@ export async function mostrarNotificacionPedido(pedido: ResumenPedidoAlerta): Pr
   new Notification(title, options)
 }
 
+/** Timbre de tienda ~3 s — square wave, volumen alto */
+const ALERTA_TONOS: { freq: number; at: number; dur: number }[] = [
+  { freq: 1046, at: 0, dur: 0.32 },
+  { freq: 1318, at: 0.5, dur: 0.32 },
+  { freq: 1046, at: 1.0, dur: 0.32 },
+  { freq: 1318, at: 1.5, dur: 0.32 },
+  { freq: 1046, at: 2.0, dur: 0.32 },
+  { freq: 1567, at: 2.5, dur: 0.45 },
+]
+
+const ALERTA_VOLUMEN = 0.85
+const ALERTA_DURACION_MS = 3200
+
 export function reproducirAlertaPedido(): void {
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     if (!AudioCtx) return
 
     const ctx = new AudioCtx()
-    const tonos = [880, 988, 880]
 
-    tonos.forEach((freq, i) => {
+    for (const { freq, at, dur } of ALERTA_TONOS) {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
-      osc.type = 'sine'
+      osc.type = 'square'
       osc.frequency.value = freq
-      gain.gain.value = 0.25
+      gain.gain.setValueAtTime(0, ctx.currentTime + at)
+      gain.gain.linearRampToValueAtTime(ALERTA_VOLUMEN, ctx.currentTime + at + 0.02)
+      gain.gain.setValueAtTime(ALERTA_VOLUMEN, ctx.currentTime + at + dur - 0.04)
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + at + dur)
       osc.connect(gain)
       gain.connect(ctx.destination)
-      const t = ctx.currentTime + i * 0.22
-      osc.start(t)
-      osc.stop(t + 0.18)
-    })
+      osc.start(ctx.currentTime + at)
+      osc.stop(ctx.currentTime + at + dur)
+    }
 
-    setTimeout(() => void ctx.close(), 900)
+    setTimeout(() => void ctx.close(), ALERTA_DURACION_MS)
 
     if ('vibrate' in navigator) {
-      navigator.vibrate([300, 100, 300, 100, 400])
+      navigator.vibrate([400, 120, 400, 120, 400, 120, 600])
     }
   } catch {
     /* silencioso si el navegador bloquea audio */
+  }
+}
+
+export function actualizarBadgeApp(pendientes: number): void {
+  if (!('setAppBadge' in navigator)) return
+  try {
+    if (pendientes > 0) {
+      void navigator.setAppBadge(pendientes)
+    } else {
+      void navigator.clearAppBadge()
+    }
+  } catch {
+    /* ignore */
   }
 }

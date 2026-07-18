@@ -1,10 +1,13 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import { usePedidoNotifications } from '@/hooks/usePedidoNotifications'
-import type { EstadoNotificaciones } from '@/lib/notificaciones-pedidos'
+import type { EstadoNotificaciones, ResumenPedidoAlerta } from '@/lib/notificaciones-pedidos'
 
 interface PedidoNotificationsContextValue {
   permiso: EstadoNotificaciones
   escuchando: boolean
+  pendientesCount: number
+  pedidoToast: ResumenPedidoAlerta | null
+  descartarToast: () => void
   activarNotificaciones: () => Promise<EstadoNotificaciones>
   probarAlerta: () => Promise<void>
 }
