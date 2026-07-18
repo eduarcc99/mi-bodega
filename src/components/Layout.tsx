@@ -20,6 +20,7 @@ import {
 import { useState, type ComponentType } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandThemeToggle } from "@/components/BrandThemeToggle";
+import { PedidoNotificationsProvider } from "@/contexts/PedidoNotificationsContext";
 
 type NavItem = {
   to: string;
@@ -185,7 +186,9 @@ export function Layout() {
         )}
 
         <main className="flex-1 overflow-auto p-4 md:p-6 dark:bg-slate-950">
-          <Outlet />
+          <PedidoNotificationsProvider activo={Boolean(perfil)}>
+            <Outlet />
+          </PedidoNotificationsProvider>
         </main>
       </div>
     </div>

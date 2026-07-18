@@ -25,11 +25,15 @@ import {
   type PedidoWeb,
   type PedidoWebEstado,
 } from '@/lib/pedidos-admin'
+import { usePedidoNotificationsContext } from '@/contexts/PedidoNotificationsContext'
+import { PedidoNotificacionesBanner } from '@/components/PedidoNotificacionesBanner'
 
 type Filtro = 'activos' | 'todos' | PedidoWebEstado
 
 export function PedidosWebPage() {
   const { perfil } = useAuth()
+  const { permiso, escuchando, activarNotificaciones, probarAlerta } =
+    usePedidoNotificationsContext()
   const [pedidos, setPedidos] = useState<PedidoWeb[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
@@ -87,6 +91,13 @@ export function PedidosWebPage() {
 
   return (
     <div className="space-y-6">
+      <PedidoNotificacionesBanner
+        permiso={permiso}
+        escuchando={escuchando}
+        onActivar={() => void activarNotificaciones()}
+        onProbar={() => void probarAlerta()}
+      />
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
