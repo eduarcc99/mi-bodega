@@ -1,7 +1,10 @@
+import { TiendaHorarioCarga } from '@/tienda/components/TiendaEstadoBanner'
+
 /** Skeleton de la grilla de productos mientras carga el catálogo */
 export function TiendaCatalogSkeleton() {
   return (
     <div className="space-y-4" aria-busy="true" aria-label="Cargando productos">
+      <TiendaHorarioCarga />
       <div className="skeleton-shimmer h-12 rounded-full lg:hidden" />
 
       <div className="flex gap-2 overflow-hidden lg:hidden">

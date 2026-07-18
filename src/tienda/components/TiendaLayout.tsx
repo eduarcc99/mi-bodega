@@ -27,7 +27,8 @@ function TiendaLayoutInner() {
   const enConfirmado = location.pathname.includes('/confirmado')
   const enCatalogo =
     location.pathname === TIENDA_BASE || location.pathname === `${TIENDA_BASE}/`
-  const mostrarBarraCarrito = !enCarrito && !enConfirmado && count > 0
+  const mostrarBarraCarrito =
+    !enCarrito && !enConfirmado && count > 0 && (abierta || !enCatalogo)
   const headerCompact = enCatalogo && (catalog?.headerCompact ?? false)
 
   const expandedHeaderRef = useRef<HTMLElement>(null)

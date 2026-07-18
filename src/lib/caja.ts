@@ -36,6 +36,7 @@ export interface AperturaCaja {
   id: string
   fecha: string
   monto: number
+  monto_yape: number
   cajero_id: string
   created_at: string
 }
@@ -43,6 +44,7 @@ export interface AperturaCaja {
 export interface ResumenCajaDia {
   fecha: string
   efectivoInicial: number
+  yapeInicial: number
   ventasEfectivo: number
   ventasYape: number
   ventasOtros: number
@@ -103,10 +105,14 @@ export function totalDesdeConteos(conteos: ConteosBilletes): number {
 
 export const UMBRAL_DIFERENCIA = 0.01
 
-export async function fetchUltimoCierre(): Promise<{ fecha: string; efectivo_declarado: number } | null> {
+export async function fetchUltimoCierre(): Promise<{
+  fecha: string
+  efectivo_declarado: number
+  yape_declarado: number
+} | null> {
   const { data } = await supabase
     .from('cierres_caja')
-    .select('fecha, efectivo_declarado')
+    .select('fecha, efectivo_declarado, yape_declarado')
     .order('fecha_hora', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -117,11 +123,14 @@ export async function fetchUltimoCierre(): Promise<{ fecha: string; efectivo_dec
 export async function abrirCaja(params: {
   cajero_id: string
   monto: number
+  monto_yape?: number
   fecha?: string
   notas?: string
 }): Promise<void> {
   const fecha = params.fecha ?? todayLocalISO()
-  if (params.monto < 0) throw new Error('El monto de apertura no puede ser negativo')
+  const montoYape = params.monto_yape ?? 0
+  if (params.monto < 0) throw new Error('El efectivo de apertura no puede ser negativo')
+  if (montoYape < 0) throw new Error('El Yape de apertura no puede ser negativo')
 
   const { data: existing } = await supabase
     .from('aperturas_caja')
@@ -134,6 +143,7 @@ export async function abrirCaja(params: {
       .from('aperturas_caja')
       .update({
         monto: params.monto,
+        monto_yape: montoYape,
         cajero_id: params.cajero_id,
         notas: params.notas || null,
       })
@@ -146,6 +156,7 @@ export async function abrirCaja(params: {
     fecha,
     cajero_id: params.cajero_id,
     monto: params.monto,
+    monto_yape: montoYape,
     notas: params.notas || null,
   })
   if (error) throw new Error(error.message)
@@ -216,16 +227,19 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
   }
   const totalDevoluciones = devoluciones.reduce((s, d) => s + Number(d.total), 0)
 
-  const yapeEsperado =
-    Math.round((ventasYape - devolucionesYape - comprasYape) * 100) / 100
-
   // Prioridad: apertura del día → cierre anterior → 0
   let efectivoInicial = 0
+  let yapeInicial = 0
   if (apertura) {
     efectivoInicial = Number(apertura.monto)
+    yapeInicial = Number(apertura.monto_yape ?? 0)
   } else if (ultimoCierre && ultimoCierre.fecha < fecha) {
     efectivoInicial = Number(ultimoCierre.efectivo_declarado)
+    yapeInicial = Number(ultimoCierre.yape_declarado ?? 0)
   }
+
+  const yapeEsperado =
+    Math.round((yapeInicial + ventasYape - devolucionesYape - comprasYape) * 100) / 100
 
   const efectivoEsperado = efectivoInicial + ventasEfectivo - totalGastos - devolucionesEfectivo
 
@@ -241,18 +255,31 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
 
   const movimientos: MovimientoCaja[] = []
 
-  movimientos.push({
-    id: 'apertura',
-    tipo: 'apertura',
-    descripcion: apertura
-      ? 'Apertura de caja (contado en la mañana)'
-      : efectivoInicial > 0
-        ? 'Efectivo con el que abriste (del cierre anterior)'
-        : 'Efectivo con el que abriste',
-    monto: efectivoInicial,
-    esEntrada: true,
-    afectaCaja: true,
-  })
+  if (efectivoInicial > 0) {
+    movimientos.push({
+      id: 'apertura-efectivo',
+      tipo: 'apertura',
+      descripcion: apertura
+        ? 'Apertura efectivo (contado en la mañana)'
+        : 'Efectivo con el que abriste (del cierre anterior)',
+      monto: efectivoInicial,
+      esEntrada: true,
+      afectaCaja: true,
+    })
+  }
+
+  if (yapeInicial > 0) {
+    movimientos.push({
+      id: 'apertura-yape',
+      tipo: 'yape_info',
+      descripcion: apertura
+        ? 'Apertura Yape (confirmado al abrir)'
+        : 'Yape con el que abriste (del cierre anterior)',
+      monto: yapeInicial,
+      esEntrada: true,
+      afectaCaja: false,
+    })
+  }
 
   for (const v of ventas) {
     const esEfectivo = v.metodo_pago === 'efectivo'
@@ -299,6 +326,7 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
   return {
     fecha,
     efectivoInicial,
+    yapeInicial,
     ventasEfectivo,
     ventasYape,
     ventasOtros,
@@ -442,6 +470,9 @@ export function exportarCierrePDF(params: {
 
   const lineas: [string, string][] = [
     ['Apertura / efectivo inicial', formatMoney(resumen.efectivoInicial)],
+    ...(resumen.yapeInicial > 0
+      ? [['Apertura Yape inicial', formatMoney(resumen.yapeInicial)] as [string, string]]
+      : []),
     ['Ventas efectivo', formatMoney(resumen.ventasEfectivo)],
     ['Ventas Yape', formatMoney(resumen.ventasYape)],
     ['Ventas otro', formatMoney(resumen.ventasOtros)],

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Package, Scale, Minus, Zap } from 'lucide-react'
+import { Plus, Package, Scale, Minus, Zap, Clock } from 'lucide-react'
 import { getOptimizedImageUrl } from '@/lib/cloudinary'
 import { formatMoney } from '@/lib/utils'
 import type { ProductoTienda } from '@/tienda/types'
@@ -8,6 +8,7 @@ import { useTiendaCart } from '@/tienda/context/TiendaCartContext'
 import { ProductoImagenSkeleton } from '@/tienda/components/TiendaSkeleton'
 import { formatNombreProducto, normalizarCategoria, cantidadEnSelector } from '@/tienda/lib/format'
 import { TIENDA_CONFIG } from '@/tienda/config'
+import { proximaApertura } from '@/tienda/lib/horario'
 
 function esPorPeso(p: ProductoTienda): boolean {
   return p.unidad === 'kg' || p.unidad === 'litro'
@@ -35,9 +36,15 @@ function subtituloUnidad(p: ProductoTienda): string {
 interface ProductoCardProps {
   producto: ProductoTienda
   onAgregado?: () => void
+  /** false cuando el delivery está fuera de horario */
+  pedidosHabilitados?: boolean
 }
 
-export function ProductoCard({ producto, onAgregado }: ProductoCardProps) {
+export function ProductoCard({
+  producto,
+  onAgregado,
+  pedidosHabilitados = true,
+}: ProductoCardProps) {
   const { items, addItem, updateQty } = useTiendaCart()
   const [modal, setModal] = useState(false)
   const [modo, setModo] = useState<CartItemTienda['modo']>('normal')
@@ -62,6 +69,7 @@ export function ProductoCard({ producto, onAgregado }: ProductoCardProps) {
   }
 
   function handleTapAgregar() {
+    if (!pedidosHabilitados) return
     if (esPorPeso(producto)) {
       setModo('peso')
       setCantidad('0.5')
@@ -145,7 +153,15 @@ export function ProductoCard({ producto, onAgregado }: ProductoCardProps) {
           </p>
 
           <div className="mt-auto flex items-end justify-end pt-3">
-            {inCart && lineInCart ? (
+            {!pedidosHabilitados ? (
+              <div
+                className="flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1.5 text-[10px] font-semibold leading-tight text-slate-500"
+                title={proximaApertura()}
+              >
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span className="line-clamp-2 text-right">Al abrir delivery</span>
+              </div>
+            ) : inCart && lineInCart ? (
               <div className="flex items-center gap-0.5 rounded-full border border-slate-200 bg-white p-0.5 shadow-sm">
                 <button
                   type="button"

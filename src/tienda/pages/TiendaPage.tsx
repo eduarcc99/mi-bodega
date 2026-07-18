@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Moon, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { fetchCatalogoTienda } from '@/tienda/lib/catalogo'
-import { isTiendaAbierta, proximaApertura, mensajeHorario } from '@/tienda/lib/horario'
+import { isTiendaAbierta, mensajeHorario } from '@/tienda/lib/horario'
 import { normalizarCategoria } from '@/tienda/lib/format'
 import { formatMoney } from '@/lib/utils'
 import { TIENDA_CONFIG } from '@/tienda/config'
@@ -10,6 +10,7 @@ import { ProductoCard } from '@/tienda/components/ProductoCard'
 import { CategoryScroller } from '@/tienda/components/CategoryScroller'
 import { CategorySidebar } from '@/tienda/components/CategorySidebar'
 import { TiendaCatalogSkeleton } from '@/tienda/components/TiendaSkeleton'
+import { TiendaCerradoBanner } from '@/tienda/components/TiendaEstadoBanner'
 import { useTiendaCart } from '@/tienda/context/TiendaCartContext'
 import { useTiendaCatalog } from '@/tienda/context/TiendaCatalogContext'
 
@@ -51,19 +52,6 @@ export function TiendaPage() {
     })
   }, [productos, busqueda, categoria])
 
-  if (!abierta) {
-    return (
-      <div className="flex flex-col items-center rounded-3xl border border-rose-100 bg-white px-6 py-16 text-center shadow-sm">
-        <div className="mb-4 rounded-full bg-rose-100 p-5">
-          <Moon className="h-10 w-10 text-rose-700" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900">Estamos cerrados</h2>
-        <p className="mt-2 text-slate-600">{proximaApertura()}</p>
-        <p className="mt-1 text-sm text-slate-400">{mensajeHorario()}</p>
-      </div>
-    )
-  }
-
   if (loading) {
     return <TiendaCatalogSkeleton />
   }
@@ -81,7 +69,7 @@ export function TiendaPage() {
   }
 
   return (
-    <div className={`${count > 0 ? 'pb-4' : ''}`}>
+    <div className={`${count > 0 && abierta ? 'pb-4' : ''}`}>
       <div className="lg:flex lg:items-start lg:gap-8">
         <CategorySidebar
           categorias={categorias}
@@ -90,6 +78,8 @@ export function TiendaPage() {
         />
 
         <div className="min-w-0 flex-1 space-y-4">
+          {!abierta && <TiendaCerradoBanner />}
+
           <div className={`tienda-catalog-toolbar lg:hidden ${headerCompact ? 'is-collapsed' : ''}`}>
             <div className="tienda-catalog-toolbar-inner space-y-4">
               <div className="relative">
@@ -118,7 +108,7 @@ export function TiendaPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
               {filtrados.map((p) => (
-                <ProductoCard key={p.id} producto={p} />
+                <ProductoCard key={p.id} producto={p} pedidosHabilitados={abierta} />
               ))}
             </div>
           )}

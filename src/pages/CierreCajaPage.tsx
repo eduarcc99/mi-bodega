@@ -41,6 +41,7 @@ export function CierreCajaPage() {
   const [editMode, setEditMode] = useState(false)
 
   const [aperturaMonto, setAperturaMonto] = useState('')
+  const [aperturaYape, setAperturaYape] = useState('')
   const [abriendo, setAbriendo] = useState(false)
 
   const [efectivoDeclarado, setEfectivoDeclarado] = useState('')
@@ -84,10 +85,10 @@ export function CierreCajaPage() {
 
       if (data.apertura) {
         setAperturaMonto(String(data.apertura.monto))
-      } else if (data.efectivoInicial > 0) {
-        setAperturaMonto(String(data.efectivoInicial))
+        setAperturaYape(String(data.apertura.monto_yape ?? 0))
       } else {
-        setAperturaMonto('')
+        setAperturaMonto(data.efectivoInicial > 0 ? String(data.efectivoInicial) : '')
+        setAperturaYape(data.yapeInicial > 0 ? String(data.yapeInicial) : '')
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar caja')
@@ -101,6 +102,7 @@ export function CierreCajaPage() {
   }, [fechaCaja])
 
   const efectivoInicial = resumen?.efectivoInicial ?? 0
+  const yapeInicial = resumen?.yapeInicial ?? 0
   const ventasEfectivo = resumen?.ventasEfectivo ?? 0
   const ventasYape = resumen?.ventasYape ?? 0
   const ventasOtros = resumen?.ventasOtros ?? 0
@@ -119,7 +121,8 @@ export function CierreCajaPage() {
   const yapeContado = parseMonto(yapeDeclarado)
   const diferencia = Math.round((declarado - efectivoEsperado) * 100) / 100
   const diferenciaYape = Math.round((yapeContado - yapeEsperado) * 100) / 100
-  const requiereYape = ventasYape > 0 || comprasYape > 0 || devolucionesYape > 0
+  const requiereYape =
+    yapeInicial > 0 || ventasYape > 0 || comprasYape > 0 || devolucionesYape > 0
   const difEfectivo = Math.abs(diferencia) >= UMBRAL_DIFERENCIA
   const difYape = requiereYape && Math.abs(diferenciaYape) >= UMBRAL_DIFERENCIA
   const hayDiferencia = difEfectivo || difYape
@@ -133,14 +136,24 @@ export function CierreCajaPage() {
   async function handleAbrirCaja() {
     if (!perfil) return
     const monto = parseFloat(aperturaMonto)
+    const montoYape = parseFloat(aperturaYape || '0')
     if (isNaN(monto) || monto < 0) {
       setError('Ingresa el efectivo con el que abres hoy')
+      return
+    }
+    if (isNaN(montoYape) || montoYape < 0) {
+      setError('Ingresa cuánto tienes en Yape al abrir')
       return
     }
     setAbriendo(true)
     setError('')
     try {
-      await abrirCaja({ cajero_id: perfil.id, monto, fecha: fechaCaja })
+      await abrirCaja({
+        cajero_id: perfil.id,
+        monto,
+        monto_yape: montoYape,
+        fecha: fechaCaja,
+      })
       setMensaje('Caja abierta — ya puedes vender y anotar gastos')
       await load()
     } catch (e) {
@@ -285,23 +298,48 @@ export function CierreCajaPage() {
             <h2 className="text-lg font-bold text-teal-900 dark:text-teal-100">Abrir caja</h2>
           </div>
           <p className="mb-4 text-sm text-teal-800 dark:text-teal-200">
-            Cuenta el efectivo con el que empiezas el día (billetes y monedas) y confírmalo.
-            {resumen && resumen.efectivoInicial > 0 && !resumen.apertura && (
+            Cuenta el efectivo y revisa tu app Yape con los que empiezas el día.
+            {resumen && !resumen.apertura && (resumen.efectivoInicial > 0 || resumen.yapeInicial > 0) && (
               <span className="mt-1 block text-xs">
-                Sugerencia del cierre anterior: {formatMoney(resumen.efectivoInicial)}
+                Sugerencia del cierre anterior:
+                {resumen.efectivoInicial > 0 && <> efectivo {formatMoney(resumen.efectivoInicial)}</>}
+                {resumen.yapeInicial > 0 && <> · Yape {formatMoney(resumen.yapeInicial)}</>}
               </span>
             )}
           </p>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={aperturaMonto}
-            onChange={(e) => setAperturaMonto(e.target.value)}
-            placeholder="Ej: 100.00"
-            className="mb-4 w-full rounded-lg border border-teal-300 bg-white px-4 py-3 text-lg font-semibold outline-none focus:border-teal-500"
-            autoFocus
-          />
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-teal-800 dark:text-teal-200">
+                <Banknote className="h-3.5 w-3.5" />
+                Efectivo en caja
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={aperturaMonto}
+                onChange={(e) => setAperturaMonto(e.target.value)}
+                placeholder="Ej: 100.00"
+                className="w-full rounded-lg border border-teal-300 bg-white px-4 py-3 text-lg font-semibold outline-none focus:border-teal-500"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-teal-800 dark:text-teal-200">
+                <Smartphone className="h-3.5 w-3.5" />
+                Saldo en Yape
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={aperturaYape}
+                onChange={(e) => setAperturaYape(e.target.value)}
+                placeholder="Ej: 50.00"
+                className="w-full rounded-lg border border-teal-300 bg-white px-4 py-3 text-lg font-semibold outline-none focus:border-teal-500"
+              />
+            </div>
+          </div>
           <button
             onClick={handleAbrirCaja}
             disabled={abriendo}
@@ -357,7 +395,10 @@ export function CierreCajaPage() {
           </div>
 
           <div className="space-y-2 text-sm">
-            <ResumenLinea label="Apertura" value={formatMoney(efectivoInicial)} />
+            <ResumenLinea label="Apertura efectivo" value={formatMoney(efectivoInicial)} />
+            {yapeInicial > 0 && (
+              <ResumenLinea label="Apertura Yape" value={formatMoney(yapeInicial)} />
+            )}
             <ResumenLinea label="Ventas efectivo" value={formatMoney(ventasEfectivo)} positivo />
             <ResumenLinea label="Ventas Yape" value={formatMoney(ventasYape)} />
             {ventasOtros > 0 && (
@@ -511,9 +552,21 @@ export function CierreCajaPage() {
                 valor={efectivoEsperado}
                 destacado
               />
-              {(ventasYape > 0 || devolucionesYape > 0 || comprasYape > 0) && (
+              {(yapeInicial > 0 || ventasYape > 0 || devolucionesYape > 0 || comprasYape > 0) && (
                 <>
                   <div className="my-2 border-t border-teal-300 dark:border-teal-700" />
+                  {yapeInicial > 0 && (
+                    <FilaCalculo
+                      icon={<Smartphone className="h-4 w-4 text-purple-600" />}
+                      label={resumen.apertura ? 'Apertura Yape' : 'Yape inicial'}
+                      valor={yapeInicial}
+                      hint={
+                        resumen.apertura
+                          ? 'Confirmado al abrir en la mañana'
+                          : 'Del cierre anterior (abre caja para fijarlo)'
+                      }
+                    />
+                  )}
                   {ventasYape > 0 && (
                     <FilaCalculo
                       icon={<Smartphone className="h-4 w-4 text-purple-600" />}

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS aperturas_caja (
   fecha DATE NOT NULL UNIQUE,
   cajero_id UUID NOT NULL REFERENCES perfiles(id),
   monto NUMERIC(12,2) NOT NULL CHECK (monto >= 0),
+  monto_yape NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (monto_yape >= 0),
   notas TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
