@@ -5,6 +5,7 @@ import type { EstadoNotificaciones, ResumenPedidoAlerta } from '@/lib/notificaci
 interface PedidoNotificationsContextValue {
   permiso: EstadoNotificaciones
   escuchando: boolean
+  pushActivo: boolean
   pendientesCount: number
   pedidoToast: ResumenPedidoAlerta | null
   descartarToast: () => void
@@ -16,12 +17,14 @@ const PedidoNotificationsContext = createContext<PedidoNotificationsContextValue
 
 export function PedidoNotificationsProvider({
   activo,
+  userId,
   children,
 }: {
   activo: boolean
+  userId: string | null
   children: ReactNode
 }) {
-  const value = usePedidoNotifications(activo)
+  const value = usePedidoNotifications(activo, userId)
   return (
     <PedidoNotificationsContext.Provider value={value}>{children}</PedidoNotificationsContext.Provider>
   )

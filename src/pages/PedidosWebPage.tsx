@@ -32,7 +32,7 @@ type Filtro = 'activos' | 'todos' | PedidoWebEstado
 
 export function PedidosWebPage() {
   const { perfil } = useAuth()
-  const { permiso, escuchando, activarNotificaciones, probarAlerta } =
+  const { permiso, escuchando, pushActivo, activarNotificaciones, probarAlerta } =
     usePedidoNotificationsContext()
   const [pedidos, setPedidos] = useState<PedidoWeb[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,6 +94,7 @@ export function PedidosWebPage() {
       <PedidoNotificacionesBanner
         permiso={permiso}
         escuchando={escuchando}
+        pushActivo={pushActivo}
         onActivar={() => void activarNotificaciones()}
         onProbar={() => void probarAlerta()}
       />

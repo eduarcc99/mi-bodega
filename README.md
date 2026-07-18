@@ -217,6 +217,45 @@ POCO A POCO:
 
 ---
 
+## Web Push — alertas con app cerrada o en redes
+
+Cuando un cliente pide en `/marghot`, el celular del staff recibe notificación **aunque Mi Bodega esté cerrada o estés en otra app** (Instagram, WhatsApp, etc.).
+
+### Configuración (una vez)
+
+1. **SQL** en Supabase → ejecutar `supabase/push-notificaciones-web.sql`
+2. **Claves VAPID** (en tu PC):
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+3. **Vercel** → Environment Variables:
+   - `VITE_VAPID_PUBLIC_KEY` = clave pública
+4. **Supabase** → Edge Functions → Secrets:
+   - `VAPID_PUBLIC_KEY` = clave pública
+   - `VAPID_PRIVATE_KEY` = clave privada
+   - `PUSH_WEBHOOK_SECRET` = string aleatorio largo
+5. **Desplegar función** (con [Supabase CLI](https://supabase.com/docs/guides/cli)):
+   ```bash
+   supabase link --project-ref wreplfrezxnhlvtpkxxq
+   supabase functions deploy notify-pedido-web --no-verify-jwt
+   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... PUSH_WEBHOOK_SECRET=...
+   ```
+6. **Database Webhook** (Supabase Dashboard → Database → Webhooks):
+   - Tabla: `pedidos_web` · Evento: **INSERT**
+   - Destino: Edge Function `notify-pedido-web`
+   - Header opcional: `x-webhook-secret` = mismo `PUSH_WEBHOOK_SECRET`
+
+### En el celular del dueño/cajero
+
+1. Instalar PWA (Agregar a pantalla de inicio)
+2. Pedidos web → **Activar** notificaciones
+3. Debe aparecer: **「Push (app cerrada / en redes)」**
+4. Probar: pedido desde otro celular en `/marghot` con Mi Bodega cerrada
+
+> El timbre de 3 s solo suena con la app abierta. Con app cerrada suena el **tono del sistema** de la notificación push.
+
+---
+
 ## Estado V1.0 — Sistema cerrado
 
 | Funcionalidad | Estado |
@@ -252,6 +291,7 @@ POCO A POCO:
 | Stock no cambia | Triggers SQL en Supabase |
 | Caja vacía de noche | Zona horaria (ya corregida en código) |
 | Cambios no se ven | `git push` + esperar deploy Vercel |
+| Push no llega cerrada | Ver sección Web Push: SQL, secrets, webhook, `VITE_VAPID_PUBLIC_KEY` en Vercel |
 
 ---
 

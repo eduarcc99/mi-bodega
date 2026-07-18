@@ -219,10 +219,10 @@ function LayoutContent() {
 }
 
 export function Layout() {
-  const { perfil } = useAuth();
+  const { perfil, user } = useAuth();
 
   return (
-    <PedidoNotificationsProvider activo={Boolean(perfil)}>
+    <PedidoNotificationsProvider activo={Boolean(perfil)} userId={user?.id ?? null}>
       <LayoutContent />
     </PedidoNotificationsProvider>
   );

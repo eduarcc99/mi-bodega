@@ -1,0 +1,2 @@
+[functions.notify-pedido-web]
+verify_jwt = false
