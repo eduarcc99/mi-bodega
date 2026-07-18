@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Minus, Plus, Trash2, ShoppingBag, Sparkles } from 'lucide-react'
+import { Trash2, ShoppingBag, Sparkles } from 'lucide-react'
 import { getOptimizedImageUrl } from '@/lib/cloudinary'
 import { formatMoney } from '@/lib/utils'
 import { lineSubtotal, useTiendaCart } from '@/tienda/context/TiendaCartContext'
@@ -10,12 +10,15 @@ import {
   tieneEnvioGratis,
   totalConDelivery,
 } from '@/tienda/lib/delivery'
+import {
+  cantidadEnSelector,
+  etiquetaCantidadDetalle,
+  formatNombreProducto,
+} from '@/tienda/lib/format'
 import type { CartItemTienda } from '@/tienda/types'
 
-function etiquetaItem(item: CartItemTienda): string {
-  if (item.modo === 'unidad_suelta') return `${item.cantidad} ud`
-  if (item.modo === 'peso') return `${item.cantidad} ${item.unidad}`
-  return `${item.cantidad} ${item.unidad}`
+function pasoItem(item: CartItemTienda): number {
+  return item.modo === 'peso' ? 0.25 : 1
 }
 
 export function CarritoPage() {
@@ -57,38 +60,42 @@ export function CarritoPage() {
                 />
               ) : null}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-slate-900">{item.nombre}</p>
-              <p className="text-xs text-slate-500">
-                {etiquetaItem(item)} × {formatMoney(item.precio_unitario)}
+            <div className="flex min-w-0 flex-1 flex-col">
+              <p className="truncate font-semibold text-slate-900">
+                {formatNombreProducto(item.nombre)}
+              </p>
+              <p className="text-xs text-slate-600">
+                {etiquetaCantidadDetalle(item.cantidad, item.unidad, item.modo)} ×{' '}
+                {formatMoney(item.precio_unitario)}
               </p>
               <p className="mt-1 font-bold text-rose-800">{formatMoney(lineSubtotal(item))}</p>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    updateQty(item.key, item.cantidad - (item.modo === 'peso' ? 0.25 : 1))
-                  }
-                  className="rounded-lg border border-slate-200 p-1"
+                  onClick={() => updateQty(item.key, item.cantidad - pasoItem(item))}
+                  className="tienda-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-slate-100 text-xl font-bold leading-none text-slate-900 hover:bg-slate-200"
+                  aria-label="Quitar uno"
                 >
-                  <Minus className="h-4 w-4" />
+                  −
                 </button>
-                <span className="w-10 text-center text-sm font-medium">{item.cantidad}</span>
+                <span className="min-w-[2.5rem] text-center text-base font-bold tabular-nums text-slate-900">
+                  {cantidadEnSelector(item.cantidad)}
+                </span>
                 <button
                   type="button"
-                  onClick={() =>
-                    updateQty(item.key, item.cantidad + (item.modo === 'peso' ? 0.25 : 1))
-                  }
-                  className="rounded-lg border border-slate-200 p-1"
+                  onClick={() => updateQty(item.key, item.cantidad + pasoItem(item))}
+                  className="tienda-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-400 bg-amber-400 text-xl font-bold leading-none text-slate-900 hover:bg-amber-300"
+                  aria-label="Agregar uno"
                 >
-                  <Plus className="h-4 w-4" />
+                  +
                 </button>
                 <button
                   type="button"
                   onClick={() => removeItem(item.key)}
-                  className="ml-auto rounded-lg p-1 text-red-400 hover:bg-red-50"
+                  className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-500 transition hover:bg-red-50"
+                  aria-label="Eliminar producto"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 stroke-[2.5]" />
                 </button>
               </div>
             </div>
@@ -127,7 +134,7 @@ export function CarritoPage() {
 
         <Link
           to={tiendaPath('checkout')}
-          className="mt-4 flex w-full items-center justify-center rounded-xl bg-rose-900 py-3.5 font-semibold text-white hover:bg-rose-800"
+          className="tienda-btn mt-4 flex w-full items-center justify-center rounded-xl bg-rose-900 py-3.5 text-base font-bold text-white hover:bg-rose-800"
         >
           Continuar pedido
         </Link>

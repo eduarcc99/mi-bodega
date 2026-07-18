@@ -179,7 +179,7 @@ export function CheckoutPage() {
       <button
         type="submit"
         disabled={processing}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] py-4 text-base font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-[#20bd5a] disabled:opacity-50"
+        className="tienda-btn flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] py-4 text-base font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-[#20bd5a] disabled:opacity-50"
       >
         {processing ? (
           <Loader2 className="h-5 w-5 animate-spin" />
