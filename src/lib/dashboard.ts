@@ -37,50 +37,75 @@ function parseFechaLocal(iso: string): Date {
   return new Date(y, m - 1, d)
 }
 
-function formatFechaCorta(iso: string): string {
-  return new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short' }).format(
+function formatFechaLarga(iso: string): string {
+  return new Intl.DateTimeFormat('es-PE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(parseFechaLocal(iso))
+}
+
+function formatMesAnio(iso: string): string {
+  return new Intl.DateTimeFormat('es-PE', { month: 'long', year: 'numeric' }).format(
     parseFechaLocal(iso),
   )
 }
 
-export function getEtiquetasKpi(
-  periodo: PeriodoFiltro,
-  fechaReferencia = todayLocalISO(),
-): { ventas: string; ganancia: string; compras: string; rango: string } {
-  const dia = formatFechaCorta(fechaReferencia)
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** Ej. "20 – 26" o "27 jul – 2 ago" */
+function formatRangoCompacto(desdeISO: string, hastaISO: string): string {
+  const desde = parseFechaLocal(desdeISO)
+  const hasta = parseFechaLocal(hastaISO)
+  const mismoMes =
+    desde.getMonth() === hasta.getMonth() && desde.getFullYear() === hasta.getFullYear()
+
+  if (mismoMes) return `${desde.getDate()} – ${hasta.getDate()}`
+
+  const mesDesde = new Intl.DateTimeFormat('es-PE', { month: 'short' }).format(desde)
+  const mesHasta = new Intl.DateTimeFormat('es-PE', { month: 'short' }).format(hasta)
+  return `${desde.getDate()} ${mesDesde} – ${hasta.getDate()} ${mesHasta}`
+}
+
+/** Etiquetas simples para tarjetas KPI (sin repetir fechas) */
+export function getEtiquetasKpi(periodo: PeriodoFiltro): {
+  ventas: string
+  ganancia: string
+  compras: string
+} {
   switch (periodo) {
     case 'hoy':
-      return {
-        ventas: `Ventas netas · ${dia}`,
-        ganancia: `Ganancia neta · ${dia}`,
-        compras: `Compras · ${dia}`,
-        rango: dia,
-      }
+      return { ventas: 'Ventas netas', ganancia: 'Ganancia neta', compras: 'Compras' }
     case 'semana':
-      return {
-        ventas: 'Ventas netas (7 días)',
-        ganancia: 'Ganancia neta (7 días)',
-        compras: 'Compras (7 días)',
-        rango: `7 días hasta ${dia}`,
-      }
+      return { ventas: 'Ventas netas', ganancia: 'Ganancia neta', compras: 'Compras' }
     case 'mes':
-      return {
-        ventas: 'Ventas netas (30 días)',
-        ganancia: 'Ganancia neta (30 días)',
-        compras: 'Compras (30 días)',
-        rango: `30 días hasta ${dia}`,
-      }
+      return { ventas: 'Ventas netas', ganancia: 'Ganancia neta', compras: 'Compras' }
   }
 }
 
-export function getEtiquetaConsumo(periodo: PeriodoFiltro): string {
+/** Una sola línea de contexto para el período seleccionado */
+export function getContextoPeriodo(
+  periodo: PeriodoFiltro,
+  fechaReferencia = todayLocalISO(),
+): string {
+  const esHoy = fechaReferencia === todayLocalISO()
+  const { desdeISO, hastaISO } = getRangoPeriodo(periodo, fechaReferencia)
+
   switch (periodo) {
     case 'hoy':
-      return 'Consumo propio hoy'
-    case 'semana':
-      return 'Consumo propio de la semana'
-    case 'mes':
-      return 'Consumo propio del mes'
+      return capitalize(formatFechaLarga(fechaReferencia))
+    case 'semana': {
+      const rango = formatRangoCompacto(desdeISO, hastaISO)
+      return esHoy ? `Esta semana · ${rango}` : `Semana · ${rango}`
+    }
+    case 'mes': {
+      const ultimo = parseFechaLocal(hastaISO).getDate()
+      const mes = capitalize(formatMesAnio(fechaReferencia))
+      return esHoy ? `Este mes · del 1 al ${ultimo}` : `${mes} · del 1 al ${ultimo}`
+    }
   }
 }
 
@@ -144,20 +169,67 @@ function endOfDay(d = new Date()): Date {
   return x
 }
 
+/** Lunes 00:00 de la semana que contiene la fecha (semana lun–dom) */
+function startOfWeekMonday(d: Date): Date {
+  const x = startOfDay(new Date(d))
+  const day = x.getDay() // 0=dom, 1=lun, …, 6=sáb
+  const daysFromMonday = day === 0 ? 6 : day - 1
+  x.setDate(x.getDate() - daysFromMonday)
+  return x
+}
+
+/** Día 1 del mes que contiene la fecha */
+function startOfMonth(d: Date): Date {
+  const x = startOfDay(new Date(d))
+  x.setDate(1)
+  return x
+}
+
+/** Domingo 23:59:59 de la semana lun–dom que contiene la fecha */
+function endOfWeekSunday(d: Date): Date {
+  const monday = startOfWeekMonday(d)
+  const sunday = new Date(monday)
+  sunday.setDate(sunday.getDate() + 6)
+  return endOfDay(sunday)
+}
+
+/** Último día 23:59:59 del mes que contiene la fecha */
+function endOfMonth(d: Date): Date {
+  const x = startOfDay(new Date(d))
+  x.setMonth(x.getMonth() + 1, 0)
+  return endOfDay(x)
+}
+
 export function getRangoPeriodo(
   periodo: PeriodoFiltro,
   fechaReferencia = todayLocalISO(),
 ): { desde: Date; hasta: Date; desdeISO: string; hastaISO: string } {
   const base = parseFechaLocal(fechaReferencia)
-  const hasta = endOfDay(base)
-  const desde = startOfDay(new Date(base))
 
-  if (periodo === 'semana') {
-    desde.setDate(desde.getDate() - 6)
-  } else if (periodo === 'mes') {
-    desde.setDate(desde.getDate() - 29)
+  if (periodo === 'hoy') {
+    const desde = startOfDay(base)
+    const hasta = endOfDay(base)
+    return {
+      desde,
+      hasta,
+      desdeISO: fechaReferencia,
+      hastaISO: fechaReferencia,
+    }
   }
 
+  if (periodo === 'semana') {
+    const desde = startOfWeekMonday(base)
+    const hasta = endOfWeekSunday(base)
+    return {
+      desde,
+      hasta,
+      desdeISO: todayLocalISO(desde),
+      hastaISO: todayLocalISO(hasta),
+    }
+  }
+
+  const desde = startOfMonth(base)
+  const hasta = endOfMonth(base)
   return {
     desde,
     hasta,

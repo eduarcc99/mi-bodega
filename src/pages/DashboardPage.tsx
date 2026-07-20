@@ -32,7 +32,7 @@ import {
   fetchMapaVencimientos,
   getRangoPeriodo,
   getEtiquetasKpi,
-  getEtiquetaConsumo,
+  getContextoPeriodo,
   calcKpisPeriodo,
   calcTopProductos,
   calcVentasPorCategoria,
@@ -129,7 +129,8 @@ export function DashboardPage() {
     loadData()
   }, [periodo, fechaRef])
 
-  const etiquetas = getEtiquetasKpi(periodo, fechaRef)
+  const etiquetas = getEtiquetasKpi(periodo)
+  const contextoPeriodo = getContextoPeriodo(periodo, fechaRef)
   const esHoy = fechaRef === todayLocalISO()
 
   const kpiCards: KpiCard[] =
@@ -218,12 +219,8 @@ export function DashboardPage() {
         <div className="flex flex-wrap items-center gap-3">
           <CalendarDays className="hidden h-5 w-5 text-teal-600 sm:block" />
           <div>
-            <p className="text-sm font-medium text-slate-700">Día de referencia</p>
-            <p className="text-xs text-slate-500">
-              {periodo === 'hoy'
-                ? 'Muestra solo este día'
-                : `Período: ${etiquetas.rango}`}
-            </p>
+            <p className="text-sm font-medium text-slate-700">Ver hasta el</p>
+            <p className="text-xs text-slate-500">{contextoPeriodo}</p>
           </div>
           <input
             type="date"
@@ -304,7 +301,7 @@ export function DashboardPage() {
                     <ShoppingBasket className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-orange-900">{getEtiquetaConsumo(periodo)}</p>
+                    <p className="text-sm font-medium text-orange-900">Consumo propio</p>
                     <p className="mt-1 text-2xl font-bold text-orange-800">
                       {formatMoney(kpisConsumo.totalCosto)}
                     </p>
