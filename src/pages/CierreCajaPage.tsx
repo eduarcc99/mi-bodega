@@ -57,6 +57,7 @@ export function CierreCajaPage() {
   const [gastoDesc, setGastoDesc] = useState('')
   const [gastoMonto, setGastoMonto] = useState('')
   const [gastoCat, setGastoCat] = useState('compra_mercaderia')
+  const [gastoMetodo, setGastoMetodo] = useState<'efectivo' | 'yape'>('efectivo')
 
   const cajaCerrada = Boolean(resumen?.cierreExistente)
   const modoResumen = cajaCerrada && !editMode
@@ -171,22 +172,34 @@ export function CierreCajaPage() {
       return
     }
     setError('')
+    const esEfectivo = gastoMetodo === 'efectivo'
     try {
       await registrarGasto({
-        descripcion: gastoDesc.trim(),
+        descripcion: esEfectivo ? gastoDesc.trim() : `${gastoDesc.trim()} (Yape)`,
         monto,
         categoria: gastoCat,
         registrado_por: perfil.id,
         fecha: fechaCaja,
+        afecta_efectivo: esEfectivo,
       })
       setShowGasto(false)
       setGastoDesc('')
       setGastoMonto('')
-      setMensaje('Gasto registrado — ya se descontó del efectivo esperado')
+      setGastoMetodo('efectivo')
+      setMensaje(
+        esEfectivo
+          ? 'Gasto registrado — descontado del efectivo esperado'
+          : 'Gasto registrado — descontado del Yape esperado',
+      )
       load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al registrar gasto')
     }
+  }
+
+  function abrirModalGasto() {
+    setGastoMetodo('efectivo')
+    setShowGasto(true)
   }
 
   async function handleCierre() {
@@ -406,7 +419,7 @@ export function CierreCajaPage() {
             )}
             <ResumenLinea label="Gastos" value={formatMoney(totalGastos)} negativo />
             {comprasYape > 0 && (
-              <ResumenLinea label="Compras pagadas con Yape" value={formatMoney(comprasYape)} negativo />
+              <ResumenLinea label="Pagos con Yape" value={formatMoney(comprasYape)} negativo />
             )}
             <div className="border-t border-slate-200 pt-2" />
             <ResumenLinea
@@ -586,7 +599,7 @@ export function CierreCajaPage() {
                   {comprasYape > 0 && (
                     <FilaCalculo
                       icon={<Minus className="h-4 w-4 text-purple-500" />}
-                      label="Compras pagadas con Yape"
+                      label="Pagos con Yape"
                       valor={comprasYape}
                       negativo
                     />
@@ -607,7 +620,7 @@ export function CierreCajaPage() {
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-slate-900 dark:text-slate-100">Gastos del día</h2>
               <button
-                onClick={() => setShowGasto(true)}
+                onClick={abrirModalGasto}
                 className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950/70"
               >
                 <Minus className="h-4 w-4" />
@@ -838,6 +851,42 @@ export function CierreCajaPage() {
                   </option>
                 ))}
               </select>
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+                  ¿Con qué pagaste?
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGastoMetodo('efectivo')}
+                    className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium ${
+                      gastoMetodo === 'efectivo'
+                        ? 'border-teal-500 bg-teal-50 text-teal-800'
+                        : 'border-slate-200 text-slate-600 dark:border-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    <Banknote className="h-4 w-4" />
+                    Efectivo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGastoMetodo('yape')}
+                    className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-medium ${
+                      gastoMetodo === 'yape'
+                        ? 'border-purple-500 bg-purple-50 text-purple-800'
+                        : 'border-slate-200 text-slate-600 dark:border-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    <Smartphone className="h-4 w-4" />
+                    Yape
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  {gastoMetodo === 'efectivo'
+                    ? 'Se descuenta del efectivo en caja'
+                    : 'Se resta del Yape esperado · no toca el efectivo físico'}
+                </p>
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowGasto(false)}

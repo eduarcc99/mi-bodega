@@ -216,7 +216,7 @@ export async function fetchResumenCaja(fecha = todayLocalISO()): Promise<Resumen
     .reduce((s, g) => s + Number(g.monto), 0)
 
   const comprasYape = gastos
-    .filter((g) => g.compra_id && !g.afecta_efectivo)
+    .filter((g) => !g.afecta_efectivo)
     .reduce((s, g) => s + Number(g.monto), 0)
 
   let devolucionesEfectivo = 0
@@ -478,7 +478,7 @@ export function exportarCierrePDF(params: {
     ['Ventas otro', formatMoney(resumen.ventasOtros)],
     ['Gastos efectivo', formatMoney(resumen.totalGastos)],
     ...(resumen.comprasYape > 0
-      ? [['Compras pagadas con Yape', formatMoney(resumen.comprasYape)] as [string, string]]
+      ? [['Pagos con Yape', formatMoney(resumen.comprasYape)] as [string, string]]
       : []),
     ['Efectivo esperado', formatMoney(resumen.efectivoEsperado)],
     ['Efectivo contado', formatMoney(efectivoDeclarado)],
