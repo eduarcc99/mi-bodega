@@ -91,7 +91,6 @@ export interface ProductoForm {
   costo: string
   margen_pct: string
   precio_venta: string
-  fecha_vencimiento: string
   activo: boolean
   imagen_url: string
   cantidad_mayor: string

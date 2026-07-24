@@ -49,7 +49,6 @@ const emptyForm: ProductoForm = {
   costo: '',
   margen_pct: '25',
   precio_venta: '',
-  fecha_vencimiento: '',
   activo: true,
   imagen_url: '',
   cantidad_mayor: '',
@@ -232,7 +231,6 @@ export function ProductosPage() {
       costo: String(p.costo),
       margen_pct: String(p.margen_pct ?? 25),
       precio_venta: String(p.precio_venta),
-      fecha_vencimiento: p.fecha_vencimiento ?? '',
       activo: p.activo,
       imagen_url: p.imagen_url ?? '',
       cantidad_mayor: p.cantidad_mayor?.toString() ?? '',
@@ -312,7 +310,6 @@ export function ProductosPage() {
       costo,
       precio_venta: precioVenta,
       margen_pct: margen,
-      fecha_vencimiento: form.fecha_vencimiento || null,
       activo: form.activo,
       imagen_url: form.imagen_url || null,
       cantidad_mayor: form.cantidad_mayor ? Number(form.cantidad_mayor) : null,
@@ -342,7 +339,7 @@ export function ProductosPage() {
     } else {
       const { data, error: saveError } = await supabase
         .from('productos')
-        .insert(payload)
+        .insert({ ...payload, fecha_vencimiento: null })
         .select('id')
         .single()
       if (saveError) {
@@ -853,15 +850,9 @@ export function ProductosPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Fecha de vencimiento</label>
-                <input
-                  type="date"
-                  value={form.fecha_vencimiento}
-                  onChange={(e) => updateForm('fecha_vencimiento', e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-teal-500"
-                />
-              </div>
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                El vencimiento se define al <strong>registrar una compra</strong>, no aquí. Ver Lotes / vencimientos.
+              </p>
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Imagen</label>

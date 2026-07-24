@@ -16,10 +16,18 @@ export interface LineaCompra {
   unidad: string
   cantidad: number
   costo_unitario: number
-  /** Fecha de vencimiento del lote que entra con esta compra (opcional) */
-  fecha_vencimiento_lote?: string | null
-  /** Vencimiento actual del catálogo (solo UI, no se guarda) */
-  vencimiento_actual?: string | null
+  /** Fecha de vencimiento del lote que entra con esta compra (obligatoria) */
+  fecha_vencimiento_lote: string
+}
+
+/** Fecha local YYYY-MM-DD, N días desde hoy */
+export function fechaVencimientoDefault(dias = 30): string {
+  const d = new Date()
+  d.setDate(d.getDate() + dias)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export type ModoPagoCompra = 'efectivo' | 'yape' | 'fiado' | 'mixto'
@@ -105,9 +113,17 @@ export function lineaCompraFromProducto(p: Producto): LineaCompra {
     unidad: p.unidad,
     cantidad: 1,
     costo_unitario: Number(p.costo) || 0,
-    fecha_vencimiento_lote: '',
-    vencimiento_actual: p.fecha_vencimiento ?? null,
+    fecha_vencimiento_lote: fechaVencimientoDefault(30),
   }
+}
+
+export function validarLineasCompra(lineas: LineaCompra[]): string | null {
+  for (const l of lineas) {
+    if (!l.fecha_vencimiento_lote?.trim()) {
+      return `"${l.nombre}": indica cuándo vence este lote`
+    }
+  }
+  return null
 }
 
 /** Último agregado primero; fusiona solo mismo producto y mismo vencimiento de lote. */
@@ -233,6 +249,9 @@ export async function registrarCompra(params: {
 
   if (lineas.length === 0) throw new Error('Agrega al menos un producto')
 
+  const errLineas = validarLineasCompra(lineas)
+  if (errLineas) throw new Error(errLineas)
+
   const total = compraTotal(lineas)
   const proveedorLabel = proveedor_nombre.trim() || 'Proveedor'
 
@@ -315,7 +334,7 @@ export async function registrarCompra(params: {
       producto_id: l.producto_id,
       cantidad: l.cantidad,
       costo_unitario: l.costo_unitario,
-      fecha_vencimiento_lote: l.fecha_vencimiento_lote?.trim() || null,
+      fecha_vencimiento_lote: l.fecha_vencimiento_lote.trim(),
     }))
 
     const { error: detalleError } = await supabase.from('compra_detalles').insert(detalles)

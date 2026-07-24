@@ -28,6 +28,7 @@ import {
   MODOS_PAGO_COMPRA,
   labelModoPagoCompra,
   validarCuotas,
+  validarLineasCompra,
   lineaCompraFromProducto,
   mergeLineaCompra,
   type LineaCompra,
@@ -293,6 +294,12 @@ export function ComprasPage() {
       return
     }
 
+    const errLineas = validarLineasCompra(lineas)
+    if (errLineas) {
+      setError(errLineas)
+      return
+    }
+
     const totalCompra = compraTotal(lineas)
     setSaving(true)
     setError('')
@@ -534,8 +541,9 @@ export function ComprasPage() {
             </div>
           ) : (
             <>
-              <p className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500 md:hidden">
-                Indica cuándo vence <strong>este lote</strong>. Cada fecha crea un lote aparte.
+              <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900 md:hidden">
+                <strong>Vence lote</strong> es obligatorio en cada producto. Si no vence (arroz, gaseosa),
+                pon una fecha lejana. Cada fecha distinta crea un lote aparte.
               </p>
               <div className="space-y-3 md:hidden">
                 {lineas.map((l) => (
@@ -543,11 +551,6 @@ export function ComprasPage() {
                     <div className="mb-3 flex items-start justify-between gap-2">
                       <div>
                         <p className="font-medium text-slate-900">{l.nombre}</p>
-                        {l.vencimiento_actual && (
-                          <p className="text-xs text-slate-400">
-                            Catálogo hoy: {formatDate(l.vencimiento_actual)}
-                          </p>
-                        )}
                       </div>
                       <button
                         type="button"
@@ -590,10 +593,13 @@ export function ComprasPage() {
                         />
                       </div>
                       <div className="col-span-2">
-                        <label className="mb-1 block text-xs text-slate-500">Vence lote</label>
+                        <label className="mb-1 block text-xs text-slate-500">
+                          Vence lote <span className="text-red-600">*</span>
+                        </label>
                         <input
                           type="date"
-                          value={l.fecha_vencimiento_lote ?? ''}
+                          required
+                          value={l.fecha_vencimiento_lote}
                           onChange={(e) =>
                             updateLinea(l.key, 'fecha_vencimiento_lote', e.target.value)
                           }
@@ -613,10 +619,10 @@ export function ComprasPage() {
               </div>
 
               <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
-              <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-500">
-                Indica cuándo vence <strong>este lote</strong>. Cada fecha crea un lote aparte
-                (ej: 3 leches al 20/07 y 6 al 05/08). Al vender se descuenta primero el que
-                vence antes.
+              <p className="border-b border-slate-100 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+                <strong>Vence lote</strong> es obligatorio. Si el producto no vence, usa una fecha lejana
+                (ej. 31/12/2030). Cada fecha distinta crea un lote aparte — al vender se descuenta primero
+                el que vence antes.
               </p>
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-left text-slate-600">
@@ -624,7 +630,7 @@ export function ComprasPage() {
                     <th className="px-4 py-2 font-medium">Producto</th>
                     <th className="px-4 py-2 font-medium">Cantidad</th>
                     <th className="px-4 py-2 font-medium">Costo unit.</th>
-                    <th className="px-4 py-2 font-medium">Vence lote</th>
+                    <th className="px-4 py-2 font-medium">Vence lote *</th>
                     <th className="px-4 py-2 font-medium">Subtotal</th>
                     <th className="px-4 py-2" />
                   </tr>
@@ -634,11 +640,6 @@ export function ComprasPage() {
                     <tr key={l.key}>
                       <td className="px-4 py-2">
                         <p className="font-medium text-slate-900">{l.nombre}</p>
-                        {l.vencimiento_actual && (
-                          <p className="text-xs text-slate-400">
-                            Catálogo hoy: {formatDate(l.vencimiento_actual)}
-                          </p>
-                        )}
                       </td>
                       <td className="px-4 py-2">
                         <input
@@ -664,7 +665,8 @@ export function ComprasPage() {
                       <td className="px-4 py-2">
                         <input
                           type="date"
-                          value={l.fecha_vencimiento_lote ?? ''}
+                          required
+                          value={l.fecha_vencimiento_lote}
                           onChange={(e) =>
                             updateLinea(l.key, 'fecha_vencimiento_lote', e.target.value)
                           }
