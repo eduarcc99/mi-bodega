@@ -132,48 +132,86 @@ export function computeStockVendibleFEFO(
 }
 
 export async function fetchStockVendible(productoId: string): Promise<number> {
+  const map = await fetchStockVendibleBatch([productoId])
+  return map.get(productoId) ?? 0
+}
+
+/** Stock vendible FEFO para varios productos en una sola consulta. */
+export async function fetchStockVendibleBatch(productoIds: string[]): Promise<Map<string, number>> {
+  const ids = [...new Set(productoIds.filter(Boolean))]
+  const map = new Map<string, number>()
+  if (ids.length === 0) return map
+
   const { data, error } = await supabase
     .from('producto_lotes')
-    .select('cantidad, fecha_vencimiento')
-    .eq('producto_id', productoId)
+    .select('producto_id, cantidad, fecha_vencimiento')
+    .in('producto_id', ids)
     .gt('cantidad', 0)
 
   if (error) throw new Error(error.message)
-  return computeStockVendibleFEFO(data ?? [])
+
+  const grouped = new Map<string, { cantidad: number; fecha_vencimiento: string | null }[]>()
+  for (const row of data ?? []) {
+    const id = row.producto_id as string
+    const arr = grouped.get(id) ?? []
+    arr.push({
+      cantidad: Number(row.cantidad),
+      fecha_vencimiento: row.fecha_vencimiento as string | null,
+    })
+    grouped.set(id, arr)
+  }
+
+  for (const id of ids) {
+    map.set(id, computeStockVendibleFEFO(grouped.get(id) ?? []))
+  }
+  return map
 }
 
 /** Crea lote si el producto tiene stock en catálogo pero sin filas en producto_lotes. */
 export async function ensureLotesFromProducto(productoId: string): Promise<boolean> {
-  const { data: prod, error: prodErr } = await supabase
+  await ensureLotesFromProductos([productoId])
+  return false
+}
+
+/** Misma lógica que ensureLotesFromProducto, en lote (menos consultas en búsqueda POS). */
+export async function ensureLotesFromProductos(productoIds: string[]): Promise<void> {
+  const ids = [...new Set(productoIds.filter(Boolean))]
+  if (ids.length === 0) return
+
+  const { data: prods, error: prodErr } = await supabase
     .from('productos')
-    .select('stock, fecha_vencimiento')
-    .eq('id', productoId)
-    .single()
+    .select('id, stock, fecha_vencimiento')
+    .in('id', ids)
 
-  if (prodErr || !prod) return false
-
-  const stock = Number(prod.stock)
-  if (stock <= 0) return false
+  if (prodErr) throw new Error(prodErr.message)
+  if (!prods?.length) return
 
   const { data: lotes, error: lotesErr } = await supabase
     .from('producto_lotes')
-    .select('cantidad')
-    .eq('producto_id', productoId)
+    .select('producto_id, cantidad')
+    .in('producto_id', ids)
 
   if (lotesErr) throw new Error(lotesErr.message)
 
-  const sumLotes = (lotes ?? []).reduce((s, l) => s + Number(l.cantidad), 0)
-  if (sumLotes > 0) return false
+  const sumPorProducto = new Map<string, number>()
+  for (const l of lotes ?? []) {
+    const id = l.producto_id as string
+    sumPorProducto.set(id, (sumPorProducto.get(id) ?? 0) + Number(l.cantidad))
+  }
 
-  const { error: insErr } = await supabase.from('producto_lotes').insert({
-    producto_id: productoId,
-    cantidad: stock,
-    fecha_vencimiento: prod.fecha_vencimiento,
-    notas: 'Stock inicial',
-  })
+  const inserts = prods
+    .filter((p) => Number(p.stock) > 0 && (sumPorProducto.get(p.id) ?? 0) <= 0)
+    .map((p) => ({
+      producto_id: p.id,
+      cantidad: Number(p.stock),
+      fecha_vencimiento: p.fecha_vencimiento,
+      notas: 'Stock inicial',
+    }))
 
+  if (inserts.length === 0) return
+
+  const { error: insErr } = await supabase.from('producto_lotes').insert(inserts)
   if (insErr) throw new Error(insErr.message)
-  return true
 }
 
 /** Alinea lotes cuando se edita stock manualmente en Productos. */

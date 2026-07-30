@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase'
 import type { CartItem } from '@/lib/pos'
 import { cantidadStockItem, cartTotal } from '@/lib/pos'
 import type { MetodoPago, Producto } from '@/types/database'
-import { ensureLotesFromProducto, fetchStockVendible } from '@/lib/lotes'
+import { ensureLotesFromProducto, ensureLotesFromProductos, fetchStockVendible, fetchStockVendibleBatch } from '@/lib/lotes'
 import { productoVencido } from '@/lib/utils'
 
 export function validateProductoParaVenta(producto: Producto, stockNecesario = 0.001): string | null {
@@ -54,16 +54,24 @@ export async function buscarProductos(query: string): Promise<Producto[]> {
   return (byName as Producto[]) ?? []
 }
 
+/** Alinea stock vendible FEFO para una lista (consultas en lote, misma lógica que antes). */
+async function alinearStockVendibleProductos(productos: Producto[]): Promise<Producto[]> {
+  if (productos.length === 0) return []
+
+  const ids = productos.map((p) => p.id)
+  await ensureLotesFromProductos(ids)
+  const stockMap = await fetchStockVendibleBatch(ids)
+
+  return productos.map((p) => ({
+    ...p,
+    stock: stockMap.get(p.id) ?? 0,
+  }))
+}
+
 /** Busca productos y alinea stock vendible (catálogo ↔ lotes). */
 export async function buscarProductosParaVenta(query: string): Promise<Producto[]> {
   const productos = await buscarProductos(query)
-  return Promise.all(
-    productos.map(async (p) => {
-      await ensureLotesFromProducto(p.id)
-      const vendible = await fetchStockVendible(p.id)
-      return { ...p, stock: vendible }
-    }),
-  )
+  return alinearStockVendibleProductos(productos)
 }
 
 export async function completarVenta(params: {
@@ -76,11 +84,10 @@ export async function completarVenta(params: {
   const { items, metodo_pago, cajero_id, fecha, notas } = params
   if (items.length === 0) throw new Error('El carrito está vacío')
 
-  for (const item of items) {
-    if (item.producto_id) {
-      await ensureLotesFromProducto(item.producto_id)
-    }
-  }
+  const productoIds = [
+    ...new Set(items.map((i) => i.producto_id).filter((id): id is string => id != null)),
+  ]
+  await ensureLotesFromProductos(productoIds)
 
   const total = cartTotal(items)
   const es_generica = items.some((i) => i.es_generica)

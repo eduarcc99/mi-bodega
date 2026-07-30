@@ -11,7 +11,7 @@ import {
   updateCartItemQuantity,
   stockNecesario,
 } from '@/lib/pos'
-import { ensureLotesFromProducto } from '@/lib/lotes'
+import { ensureLotesFromProductos } from '@/lib/lotes'
 import { validateStockLotesParaVenta } from '@/lib/ventas'
 import type { Producto } from '@/types/database'
 import { localDayRangeISO, productoVencido, todayLocalISO } from '@/lib/utils'
@@ -122,11 +122,10 @@ export async function completarConsumo(params: {
     throw new Error('El consumo propio solo admite productos del catálogo')
   }
 
-  for (const item of catalogados) {
-    if (item.producto_id) {
-      await ensureLotesFromProducto(item.producto_id)
-    }
-  }
+  const productoIds = [
+    ...new Set(catalogados.map((i) => i.producto_id).filter((id): id is string => id != null)),
+  ]
+  await ensureLotesFromProductos(productoIds)
 
   const total_costo = totalCosto(catalogados)
   const total_venta_potencial = totalVentaPotencial(catalogados)
