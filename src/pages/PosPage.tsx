@@ -34,6 +34,7 @@ import {
 import { buscarProductosParaVenta, completarVenta, validateStockLotesParaVenta } from '@/lib/ventas'
 import { formatMoney } from '@/lib/utils'
 import type { MetodoPago, Producto } from '@/types/database'
+import type { TicketEntregaInfo } from '@/lib/ticketBranding'
 import { VentaTicket } from '@/components/pos/VentaTicket'
 
 const CameraScannerModal = lazy(() =>
@@ -59,6 +60,9 @@ export function PosPage() {
   const [avisoBusqueda, setAvisoBusqueda] = useState('')
   const [processing, setProcessing] = useState(false)
   const [ventaCompletada, setVentaCompletada] = useState<VentaCompletada | null>(null)
+  const [ticketEntrega, setTicketEntrega] = useState<TicketEntregaInfo | undefined>()
+  const [esDelivery, setEsDelivery] = useState(false)
+  const [cobrarAlEntregar, setCobrarAlEntregar] = useState(false)
   const [flashAgregado, setFlashAgregado] = useState('')
 
   const [showGeneric, setShowGeneric] = useState(false)
@@ -311,6 +315,9 @@ export function PosPage() {
         fecha: venta.fecha,
         items: [...cart],
       })
+      setTicketEntrega(esDelivery ? { cobrarAlEntregar } : undefined)
+      setEsDelivery(false)
+      setCobrarAlEntregar(false)
       setCart([])
       setBusqueda('')
       setResultados([])
@@ -579,6 +586,32 @@ export function PosPage() {
           <h2 className="mb-1 font-semibold text-slate-900">Total a pagar</h2>
           <p className="text-3xl font-bold text-slate-900">{formatMoney(total)}</p>
 
+          <div className="mt-4 space-y-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={esDelivery}
+                onChange={(e) => {
+                  setEsDelivery(e.target.checked)
+                  if (!e.target.checked) setCobrarAlEntregar(false)
+                }}
+                className="rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              />
+              Venta delivery
+            </label>
+            {esDelivery && (
+              <label className="flex cursor-pointer items-center gap-2 pl-6 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={cobrarAlEntregar}
+                  onChange={(e) => setCobrarAlEntregar(e.target.checked)}
+                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                />
+                Cobrar al entregar (efectivo en puerta)
+              </label>
+            )}
+          </div>
+
           <div className="mt-6 space-y-2">
             <button
               onClick={() => handlePago('efectivo')}
@@ -767,8 +800,10 @@ export function PosPage() {
         <VentaTicket
           venta={ventaCompletada}
           cajeroNombre={perfil.nombre}
+          entrega={ticketEntrega}
           onClose={() => {
             setVentaCompletada(null)
+            setTicketEntrega(undefined)
             focusSearch()
           }}
         />
