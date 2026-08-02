@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { calcularPrecioVenta } from '@/lib/utils'
+import { calcularPrecioVenta, diasHastaVencimiento, todayLocalISO } from '@/lib/utils'
 import type { MetodoPago, Producto } from '@/types/database'
 import {
   crearGastoCompra,
@@ -16,9 +16,14 @@ export interface LineaCompra {
   unidad: string
   cantidad: number
   costo_unitario: number
-  /** Fecha de vencimiento del lote que entra con esta compra (obligatoria) */
+  /** Fecha de vencimiento del lote que entra con esta compra (obligatoria si no marca "No vence") */
   fecha_vencimiento_lote: string
+  /** Producto sin fecha de vencimiento (usa fecha lejana interna) */
+  sin_vencimiento?: boolean
 }
+
+/** Fecha usada en BD para productos que no vencen */
+export const FECHA_LOTE_SIN_VENCIMIENTO = '2030-12-31'
 
 /** Fecha local YYYY-MM-DD, N días desde hoy */
 export function fechaVencimientoDefault(dias = 30): string {
@@ -113,17 +118,35 @@ export function lineaCompraFromProducto(p: Producto): LineaCompra {
     unidad: p.unidad,
     cantidad: 1,
     costo_unitario: Number(p.costo) || 0,
-    fecha_vencimiento_lote: fechaVencimientoDefault(30),
+    fecha_vencimiento_lote: '',
+    sin_vencimiento: false,
   }
 }
 
 export function validarLineasCompra(lineas: LineaCompra[]): string | null {
+  const hoy = todayLocalISO()
   for (const l of lineas) {
-    if (!l.fecha_vencimiento_lote?.trim()) {
-      return `"${l.nombre}": indica cuándo vence este lote`
+    if (l.sin_vencimiento) continue
+    const fv = l.fecha_vencimiento_lote?.trim()
+    if (!fv) {
+      return `"${l.nombre}": indica cuándo vence este lote o marca "No vence"`
+    }
+    if (fv < hoy) {
+      return `"${l.nombre}": la fecha de vencimiento no puede ser anterior a hoy`
     }
   }
   return null
+}
+
+/** Lotes que vencen pronto (para confirmación antes de guardar) */
+export function lineasConVencimientoCorto(lineas: LineaCompra[], diasMax = 7): LineaCompra[] {
+  return lineas.filter((l) => {
+    if (l.sin_vencimiento) return false
+    const fv = l.fecha_vencimiento_lote?.trim()
+    if (!fv) return false
+    const dias = diasHastaVencimiento(fv)
+    return dias !== null && dias <= diasMax
+  })
 }
 
 /** Último agregado primero; fusiona solo mismo producto y mismo vencimiento de lote. */
@@ -252,7 +275,13 @@ export async function registrarCompra(params: {
   const errLineas = validarLineasCompra(lineas)
   if (errLineas) throw new Error(errLineas)
 
-  const total = compraTotal(lineas)
+  const lineasAGuardar = lineas.map((l) => ({
+    ...l,
+    fecha_vencimiento_lote: l.sin_vencimiento
+      ? FECHA_LOTE_SIN_VENCIMIENTO
+      : l.fecha_vencimiento_lote.trim(),
+  }))
+  const total = compraTotal(lineasAGuardar)
   const proveedorLabel = proveedor_nombre.trim() || 'Proveedor'
 
   let montoPagadoHoy = 0
@@ -329,18 +358,18 @@ export async function registrarCompra(params: {
   const compraId = compra.id
 
   try {
-    const detalles = lineas.map((l) => ({
+    const detalles = lineasAGuardar.map((l) => ({
       compra_id: compraId,
       producto_id: l.producto_id,
       cantidad: l.cantidad,
       costo_unitario: l.costo_unitario,
-      fecha_vencimiento_lote: l.fecha_vencimiento_lote.trim(),
+      fecha_vencimiento_lote: l.fecha_vencimiento_lote,
     }))
 
     const { error: detalleError } = await supabase.from('compra_detalles').insert(detalles)
     if (detalleError) throw new Error(detalleError.message)
 
-    for (const l of lineas) {
+    for (const l of lineasAGuardar) {
       await actualizarPrecioVenta(l.producto_id, l.costo_unitario)
     }
 

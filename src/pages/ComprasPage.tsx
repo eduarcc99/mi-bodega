@@ -29,6 +29,7 @@ import {
   labelModoPagoCompra,
   validarCuotas,
   validarLineasCompra,
+  lineasConVencimientoCorto,
   lineaCompraFromProducto,
   mergeLineaCompra,
   type LineaCompra,
@@ -201,8 +202,32 @@ export function ComprasPage() {
     value: number | string,
   ) {
     setLineas((prev) =>
-      prev.map((l) => (l.key === key ? { ...l, [field]: value } : l)),
+      prev.map((l) => {
+        if (l.key !== key) return l
+        if (field === 'fecha_vencimiento_lote') {
+          return { ...l, fecha_vencimiento_lote: String(value), sin_vencimiento: false }
+        }
+        return { ...l, [field]: value }
+      }),
     )
+  }
+
+  function toggleSinVencimiento(key: string, activo: boolean) {
+    setLineas((prev) =>
+      prev.map((l) =>
+        l.key === key
+          ? {
+              ...l,
+              sin_vencimiento: activo,
+              fecha_vencimiento_lote: activo ? '' : l.fecha_vencimiento_lote,
+            }
+          : l,
+      ),
+    )
+  }
+
+  function fechaLoteInvalida(l: LineaCompra): boolean {
+    return !l.sin_vencimiento && !l.fecha_vencimiento_lote?.trim()
   }
 
   function cambiarModoPago(m: ModoPagoCompra) {
@@ -298,6 +323,15 @@ export function ComprasPage() {
     if (errLineas) {
       setError(errLineas)
       return
+    }
+
+    const vencenPronto = lineasConVencimientoCorto(lineas)
+    if (vencenPronto.length > 0) {
+      const lista = vencenPronto.map((l) => l.nombre).join(', ')
+      const ok = window.confirm(
+        `Estos productos vencen en 7 días o menos:\n${lista}\n\n¿Registrar la compra igual?`,
+      )
+      if (!ok) return
     }
 
     const totalCompra = compraTotal(lineas)
@@ -598,13 +632,28 @@ export function ComprasPage() {
                         </label>
                         <input
                           type="date"
-                          required
+                          required={!l.sin_vencimiento}
+                          min={todayLocalISO()}
+                          disabled={l.sin_vencimiento}
                           value={l.fecha_vencimiento_lote}
                           onChange={(e) =>
                             updateLinea(l.key, 'fecha_vencimiento_lote', e.target.value)
                           }
-                          className="w-full rounded border border-slate-300 px-2 py-2 text-sm"
+                          className={`w-full rounded border px-2 py-2 text-sm ${
+                            fechaLoteInvalida(l)
+                              ? 'border-red-400 bg-red-50'
+                              : 'border-slate-300'
+                          } disabled:bg-slate-100 disabled:text-slate-400`}
                         />
+                        <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={l.sin_vencimiento ?? false}
+                            onChange={(e) => toggleSinVencimiento(l.key, e.target.checked)}
+                            className="rounded border-slate-300"
+                          />
+                          No vence (arroz, detergente, etc.)
+                        </label>
                       </div>
                     </div>
                     <p className="mt-2 text-right text-sm font-medium text-teal-700">
@@ -620,9 +669,8 @@ export function ComprasPage() {
 
               <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
               <p className="border-b border-slate-100 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-                <strong>Vence lote</strong> es obligatorio. Si el producto no vence, usa una fecha lejana
-                (ej. 31/12/2030). Cada fecha distinta crea un lote aparte — al vender se descuenta primero
-                el que vence antes.
+                <strong>Vence lote</strong> es obligatorio: elige la fecha del empaque o marca{' '}
+                <strong>No vence</strong>. No se guarda con fecha automática.
               </p>
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-left text-slate-600">
@@ -663,15 +711,32 @@ export function ComprasPage() {
                         />
                       </td>
                       <td className="px-4 py-2">
-                        <input
-                          type="date"
-                          required
-                          value={l.fecha_vencimiento_lote}
-                          onChange={(e) =>
-                            updateLinea(l.key, 'fecha_vencimiento_lote', e.target.value)
-                          }
-                          className="w-[9.5rem] rounded border border-slate-300 px-2 py-1 text-xs"
-                        />
+                        <div className="space-y-1">
+                          <input
+                            type="date"
+                            required={!l.sin_vencimiento}
+                            min={todayLocalISO()}
+                            disabled={l.sin_vencimiento}
+                            value={l.fecha_vencimiento_lote}
+                            onChange={(e) =>
+                              updateLinea(l.key, 'fecha_vencimiento_lote', e.target.value)
+                            }
+                            className={`w-[9.5rem] rounded border px-2 py-1 text-xs ${
+                              fechaLoteInvalida(l)
+                                ? 'border-red-400 bg-red-50'
+                                : 'border-slate-300'
+                            } disabled:bg-slate-100 disabled:text-slate-400`}
+                          />
+                          <label className="flex cursor-pointer items-center gap-1 text-[10px] text-slate-500">
+                            <input
+                              type="checkbox"
+                              checked={l.sin_vencimiento ?? false}
+                              onChange={(e) => toggleSinVencimiento(l.key, e.target.checked)}
+                              className="rounded border-slate-300"
+                            />
+                            No vence
+                          </label>
+                        </div>
                       </td>
                       <td className="px-4 py-2 font-medium">{formatMoney(lineaSubtotal(l))}</td>
                       <td className="px-4 py-2">
