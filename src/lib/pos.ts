@@ -111,7 +111,12 @@ export function productoFromCart(
   }
 }
 
-export function genericCartItem(nombre: string, precio: number, cantidad = 1): CartItem {
+export function genericCartItem(
+  nombre: string,
+  precio: number,
+  costo: number,
+  cantidad = 1,
+): CartItem {
   return {
     key: `gen-${Date.now()}`,
     producto_id: null,
@@ -120,7 +125,7 @@ export function genericCartItem(nombre: string, precio: number, cantidad = 1): C
     precio_original: precio,
     precio_unitario: precio,
     descuento: 0,
-    costo_unitario: 0,
+    costo_unitario: Math.max(0, costo),
     unidad: 'unidad',
     stock_disponible: null,
     es_generica: true,

@@ -379,11 +379,15 @@ export function totalDevoluciones(devoluciones: DevolucionEnRango[]): number {
   return devoluciones.reduce((s, d) => s + Number(d.total), 0)
 }
 
+import { esGenericaSinCosto } from '@/lib/ganancia'
+
 export function gananciaPerdidaDevoluciones(devoluciones: DevolucionEnRango[]): number {
   let perdida = 0
   for (const dev of devoluciones) {
     for (const d of dev.devolucion_detalles ?? []) {
-      const costo = Number(d.venta_detalles?.costo_unitario ?? 0)
+      const vd = d.venta_detalles
+      const costo = Number(vd?.costo_unitario ?? 0)
+      if (esGenericaSinCosto(vd?.producto_id ?? null, costo)) continue
       perdida += Number(d.monto_devuelto) - costo * Number(d.cantidad)
     }
   }

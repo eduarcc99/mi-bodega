@@ -4,6 +4,7 @@ import {
   totalDevoluciones,
   type DevolucionEnRango,
 } from '@/lib/devoluciones'
+import { gananciaContableDetalle } from '@/lib/ganancia'
 import { diasHastaVencimiento, productoVencido, stockBajo, todayLocalISO } from '@/lib/utils'
 import type { Producto } from '@/types/database'
 
@@ -238,10 +239,6 @@ export function getRangoPeriodo(
   }
 }
 
-function lineaGanancia(cantidad: number, precio: number, descuento: number, costo: number): number {
-  return precio * cantidad - descuento - costo * cantidad
-}
-
 function lineaMonto(cantidad: number, precio: number, descuento: number): number {
   return precio * cantidad - descuento
 }
@@ -320,12 +317,13 @@ export function calcKpisPeriodo(
   let gananciaNeta = 0
   for (const v of ventas) {
     for (const d of v.venta_detalles ?? []) {
-      gananciaNeta += lineaGanancia(
-        Number(d.cantidad),
-        Number(d.precio_unitario),
-        Number(d.descuento),
-        Number(d.costo_unitario),
-      )
+      gananciaNeta += gananciaContableDetalle({
+        producto_id: d.producto_id,
+        cantidad: Number(d.cantidad),
+        precio_unitario: Number(d.precio_unitario),
+        descuento: Number(d.descuento),
+        costo_unitario: Number(d.costo_unitario),
+      })
     }
   }
   gananciaNeta -= gananciaPerdidaDevoluciones(devoluciones)
@@ -460,12 +458,13 @@ export function calcTopGanancia(
   for (const v of ventas) {
     for (const d of v.venta_detalles ?? []) {
       const key = d.nombre_producto
-      const g = lineaGanancia(
-        Number(d.cantidad),
-        Number(d.precio_unitario),
-        Number(d.descuento),
-        Number(d.costo_unitario),
-      )
+      const g = gananciaContableDetalle({
+        producto_id: d.producto_id,
+        cantidad: Number(d.cantidad),
+        precio_unitario: Number(d.precio_unitario),
+        descuento: Number(d.descuento),
+        costo_unitario: Number(d.costo_unitario),
+      })
       map.set(key, (map.get(key) ?? 0) + g)
     }
   }
@@ -473,7 +472,9 @@ export function calcTopGanancia(
   for (const dev of devoluciones) {
     for (const d of dev.devolucion_detalles ?? []) {
       const key = d.venta_detalles?.nombre_producto ?? 'Producto'
-      const costo = Number(d.venta_detalles?.costo_unitario ?? 0)
+      const vd = d.venta_detalles
+      const costo = Number(vd?.costo_unitario ?? 0)
+      if (!vd?.producto_id && costo <= 0) continue
       const gPerdida = Number(d.monto_devuelto) - costo * Number(d.cantidad)
       map.set(key, (map.get(key) ?? 0) - gPerdida)
     }
