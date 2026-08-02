@@ -26,6 +26,7 @@ import {
   type VentaCompletada,
   cartTotal,
   cartItemSubtotal,
+  kgDesdeMontoVenta,
   productoFromCart,
   genericCartItem,
   mergeCartItems,
@@ -57,7 +58,10 @@ const CameraScannerModal = lazy(() =>
 interface ModalAgregar {
   producto: Producto;
   modo: ModoVenta;
+  /** kg/unidades, o soles totales si entradaPeso === 'monto' */
   cantidad: string;
+  entradaPeso: "kg" | "monto";
+  precioKg: string;
 }
 
 export function PosPage() {
@@ -150,6 +154,8 @@ export function PosPage() {
       producto,
       modo,
       cantidad: modo === "peso" ? "0.5" : "1",
+      entradaPeso: "kg",
+      precioKg: String(producto.precio_venta),
     });
   }
 
@@ -161,14 +167,41 @@ export function PosPage() {
 
   async function confirmarAgregarModal() {
     if (!modalAgregar) return;
-    const { producto, modo, cantidad: cantStr } = modalAgregar;
-    const cantidad = parseFloat(cantStr);
-    if (isNaN(cantidad) || cantidad <= 0) {
-      setError("Ingresa una cantidad válida");
-      return;
+    const { producto, modo, cantidad: cantStr, entradaPeso, precioKg } = modalAgregar;
+
+    let cantidad: number;
+    let precioUnitarioOverride: number | undefined;
+
+    if (modo === "peso" && entradaPeso === "monto") {
+      const monto = parseFloat(cantStr);
+      const precio = parseFloat(precioKg);
+      if (isNaN(monto) || monto <= 0) {
+        setError("Ingresa el total a cobrar en soles");
+        return;
+      }
+      if (isNaN(precio) || precio <= 0) {
+        setError("Ingresa un precio por kg válido");
+        return;
+      }
+      cantidad = kgDesdeMontoVenta(monto, precio);
+      if (cantidad <= 0) {
+        setError("El monto es muy bajo para calcular el peso");
+        return;
+      }
+      precioUnitarioOverride = precio;
+    } else {
+      cantidad = parseFloat(cantStr);
+      if (isNaN(cantidad) || cantidad <= 0) {
+        setError("Ingresa una cantidad válida");
+        return;
+      }
     }
 
     const itemPreview = productoFromCart(producto, cantidad, modo);
+    if (precioUnitarioOverride != null) {
+      itemPreview.precio_unitario = precioUnitarioOverride;
+      itemPreview.precio_original = precioUnitarioOverride;
+    }
     const stockReq = stockNecesario(itemPreview);
     const stockUsado = stockEnCarrito(producto.id, modo);
 
@@ -742,7 +775,14 @@ export function PosPage() {
                   type="button"
                   onClick={() =>
                     setModalAgregar((m) =>
-                      m ? { ...m, modo: "peso", cantidad: "0.5" } : m,
+                      m
+                        ? {
+                            ...m,
+                            modo: "peso",
+                            cantidad: m.entradaPeso === "monto" ? "" : "0.5",
+                            entradaPeso: "kg",
+                          }
+                        : m,
                     )
                   }
                   className={`rounded-lg border py-2.5 text-sm font-medium ${
@@ -777,15 +817,86 @@ export function PosPage() {
               </div>
             )}
 
+            {modalAgregar.modo === "peso" && (
+              <div className="mb-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setModalAgregar((m) =>
+                      m ? { ...m, entradaPeso: "kg", cantidad: "0.5" } : m,
+                    )
+                  }
+                  className={`rounded-lg border py-2 text-sm font-medium ${
+                    modalAgregar.entradaPeso === "kg"
+                      ? "border-teal-500 bg-teal-50 text-teal-800"
+                      : "border-slate-200 text-slate-600"
+                  }`}
+                >
+                  Por kg
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setModalAgregar((m) =>
+                      m
+                        ? {
+                            ...m,
+                            entradaPeso: "monto",
+                            cantidad: "",
+                            precioKg: String(m.producto.precio_venta),
+                          }
+                        : m,
+                    )
+                  }
+                  className={`rounded-lg border py-2 text-sm font-medium ${
+                    modalAgregar.entradaPeso === "monto"
+                      ? "border-teal-500 bg-teal-50 text-teal-800"
+                      : "border-slate-200 text-slate-600"
+                  }`}
+                >
+                  Por monto (S/)
+                </button>
+              </div>
+            )}
+
+            {modalAgregar.modo === "peso" &&
+              modalAgregar.entradaPeso === "monto" && (
+                <>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Precio por kg (S/)
+                  </label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={modalAgregar.precioKg}
+                    onChange={(e) =>
+                      setModalAgregar((m) =>
+                        m ? { ...m, precioKg: e.target.value } : m,
+                      )
+                    }
+                    className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500"
+                  />
+                </>
+              )}
+
             <label className="mb-1 block text-sm font-medium text-slate-700">
               {modalAgregar.modo === "unidad_suelta"
                 ? "Cantidad (unidades)"
-                : `Cantidad (${productoModal.unidad})`}
+                : modalAgregar.entradaPeso === "monto"
+                  ? "Total a cobrar (S/)"
+                  : `Cantidad (${productoModal.unidad})`}
             </label>
             <input
               type="number"
-              min="0.001"
-              step={modalAgregar.modo === "peso" ? "0.001" : "1"}
+              min={modalAgregar.entradaPeso === "monto" ? "0.01" : "0.001"}
+              step={
+                modalAgregar.modo === "peso" && modalAgregar.entradaPeso === "kg"
+                  ? "0.001"
+                  : modalAgregar.entradaPeso === "monto"
+                    ? "0.01"
+                    : "1"
+              }
               value={modalAgregar.cantidad}
               onChange={(e) =>
                 setModalAgregar((m) =>
@@ -798,9 +909,27 @@ export function PosPage() {
                   confirmarAgregarModal();
                 }
               }}
+              placeholder={
+                modalAgregar.entradaPeso === "monto" ? "Ej. 15.00" : undefined
+              }
               className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-lg outline-none focus:border-teal-500"
               autoFocus
             />
+
+            {modalAgregar.modo === "peso" &&
+              modalAgregar.entradaPeso === "monto" && (
+                <p className="-mt-2 mb-4 text-sm text-teal-700">
+                  {(() => {
+                    const monto = parseFloat(modalAgregar.cantidad || "0");
+                    const precio = parseFloat(modalAgregar.precioKg || "0");
+                    if (monto > 0 && precio > 0) {
+                      const kg = kgDesdeMontoVenta(monto, precio);
+                      return `≈ ${kg.toFixed(3)} kg a descontar del stock`;
+                    }
+                    return "Ingresa el total y el precio/kg para calcular el peso";
+                  })()}
+                </p>
+              )}
 
             {modalAgregar.modo === "unidad_suelta" &&
               productoModal.peso_estimado_unidad && (

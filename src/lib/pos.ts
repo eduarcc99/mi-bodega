@@ -79,6 +79,12 @@ export function cartTotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + cartItemSubtotal(item), 0)
 }
 
+/** Calcula kg a descontar cuando el cajero ingresa el total en soles (ej. pollo). */
+export function kgDesdeMontoVenta(monto: number, precioPorKg: number): number {
+  if (precioPorKg <= 0 || monto <= 0) return 0
+  return Math.round((monto / precioPorKg) * 1000) / 1000
+}
+
 export function productoFromCart(
   producto: Producto,
   cantidad: number,
